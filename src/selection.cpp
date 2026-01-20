@@ -236,10 +236,6 @@ void Selection::rotateAnchored(double angle_degrees, double zoom)
             center = _previous_rotate_anchor;
         }
 
-        if (auto d = desktop()) {
-            angle_degrees *= d->yaxisdir();
-        }
-
         if (zoom != 1.0) {
             Geom::Point m = bbox->midpoint();
             unsigned i = 0;
@@ -259,14 +255,17 @@ void Selection::rotateAnchored(double angle_degrees, double zoom)
         // Remember the rotation anchor for multiple rotation events.
         _previous_rotate_anchor = center;
 
-        if (angle_degrees == 90.0) {
+        // Visual angle might be different from actual angle,
+        // when y axis points up.
+        double visual_angle = angle_degrees * document()->yaxisdir();
+
+        if (visual_angle == 90.0) {
             DocumentUndo::maybeDone(document(), "selector:rotate:cw", RC_("Undo", "Rotate 90\xc2\xb0 CW"), INKSCAPE_ICON("object-rotate-right"));
-        } else if (angle_degrees == -90.0) {
+        } else if (visual_angle == -90.0) {
             DocumentUndo::maybeDone(document(), "selector:rotate:ccw", RC_("Undo", "Rotate 90\xc2\xb0 CCW"), INKSCAPE_ICON("object-rotate-left"));
         } else {
-            DocumentUndo::maybeDone(document(),
-                                ( ( angle_degrees > 0 )? "selector:rotate:ccw": "selector:rotate:cw" ),
-                                RC_("Undo", "Rotate"), INKSCAPE_ICON("tool-pointer"));
+            DocumentUndo::maybeDone(document(), ((visual_angle > 0) ? "selector:rotate:ccw" : "selector:rotate:cw"),
+                                    RC_("Undo", "Rotate"), INKSCAPE_ICON("tool-pointer"));
         }
     }
 }

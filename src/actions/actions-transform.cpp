@@ -86,6 +86,10 @@ void
 transform_rotate(const Glib::VariantBase& value, InkscapeApplication *app)
 {
     auto angle = (Glib::VariantBase::cast_dynamic<Glib::Variant<double>>(value)).get();
+
+    if (auto doc = app->get_active_document()) {
+        angle *= doc->yaxisdir();
+    }
     app->get_active_selection()->rotateAnchored(angle);
 }
 
@@ -96,6 +100,10 @@ transform_rotate_step(const Glib::VariantBase& value, InkscapeApplication *app)
 
     auto angle = (Glib::VariantBase::cast_dynamic<Glib::Variant<double>>(value)).get();
     double snaps = prefs->getDoubleLimited("/options/rotationsnapsperpi/value", 12.0, 0.1, 1800.0);
+
+    if (auto doc = app->get_active_document()) {
+        angle *= doc->yaxisdir();
+    }
     app->get_active_selection()->rotateAnchored(angle / snaps);
 }
 
@@ -103,9 +111,10 @@ void
 transform_rotate_screen(const Glib::VariantBase& value, InkscapeWindow *win)
 {
     auto angle = (Glib::VariantBase::cast_dynamic<Glib::Variant<double>>(value)).get();
-    auto desktop = win->get_desktop();
-
-    desktop->getSelection()->rotateAnchored(angle, desktop->current_zoom());
+    if (auto desktop = win->get_desktop()) {
+        angle *= desktop->yaxisdir();
+        desktop->getSelection()->rotateAnchored(angle, desktop->current_zoom());
+    }
 }
 
 
