@@ -150,7 +150,6 @@ int InkFontDict::hashFontObject(Object *obj)
 
 void InkFontDict::hashFontObject1(const Object *obj, FNVHash *h)
 {
-    const GooString *s;
     const char *p;
     double r;
     int n, i;
@@ -170,11 +169,16 @@ void InkFontDict::hashFontObject1(const Object *obj, FNVHash *h)
             r = obj->getReal();
             h->hash((char *)&r, sizeof(double));
             break;
-        case objString:
+        case objString: {
             h->hash('s');
-            s = obj->getString();
+#if POPPLER_CHECK_VERSION(26, 4, 0)
+            const auto &s = obj->getString();
+            h->hash(s.c_str(), s.size());
+#else
+            const GooString* s = obj->getString();
             h->hash(s->c_str(), get_goostring_length(*s));
-            break;
+#endif
+            } break;
         case objName:
             h->hash('n');
             p = obj->getName();
@@ -647,40 +651,46 @@ std::string getString(const std::unique_ptr<GooString> &value)
     return getString(value.get());
 }
 
+std::string getString(const GooString *value)
+{
+    if (value) {
+        return getString(value->toStr());
+    }
+    return "";
+}
+
 /**
  * Convert PDF strings, which can be formatted as UTF8, UTF16BE or UTF16LE into
  * a predictable UTF8 string consistant with svg requirements.
  */
-std::string getString(const GooString *value)
+std::string getString(const std::string &value)
 {
-    if (value) {
-        int stringLength;
-        char *str = nullptr;
+    char *str = nullptr;
+    int stringLength;
 
-        if (_POPPLER_HAS_UNICODE_BOM(value)) {
-            str = g_convert(value->getCString () + 2, get_goostring_length(*value) - 2,
-                            "UTF-8", "UTF-16BE", NULL, NULL, NULL);
-        } else if (_POPPLER_HAS_UNICODE_BOMLE(value)) {
-            str = g_convert(value->getCString () + 2, get_goostring_length(*value) - 2,
-                            "UTF-8", "UTF-16LE", NULL, NULL, NULL);
-        }
-#if POPPLER_CHECK_VERSION(25,02,0)
-        else if (auto utf16 = pdfDocEncodingToUTF16(value->toStr()); !utf16.empty())  {
-            str = g_convert(utf16.c_str(), utf16.length(), "UTF-8", "UTF-16", NULL, NULL, NULL);
-        }
-#else
-        else if (auto utf16 = pdfDocEncodingToUTF16(value->toStr(), &stringLength))  {
-            str = g_convert(utf16, stringLength, "UTF-8", "UTF-16", NULL, NULL, NULL);
-            delete[] utf16;
-        }
-#endif
-        if (str) {
-            std::string copy = str;
-            g_free(str);
-            return copy;
-        }
-        g_warning("Couldn't parse text in PDF from UTF16.");
+    if (_POPPLER_HAS_UNICODE_BOM(value)) {
+        str = g_convert(value.c_str() + 2, value.size() - 2,
+                        "UTF-8", "UTF-16BE", NULL, NULL, NULL);
+    } else if (_POPPLER_HAS_UNICODE_BOMLE(value)) {
+        str = g_convert(value.c_str() + 2, value.size() - 2,
+                        "UTF-8", "UTF-16LE", NULL, NULL, NULL);
     }
+#if POPPLER_CHECK_VERSION(25,02,0)
+    else if (auto utf16 = pdfDocEncodingToUTF16(value); !utf16.empty())  {
+        str = g_convert(utf16.c_str(), utf16.length(), "UTF-8", "UTF-16", NULL, NULL, NULL);
+    }
+#else
+    else if (auto utf16 = pdfDocEncodingToUTF16(value, &stringLength))  {
+        str = g_convert(utf16, stringLength, "UTF-8", "UTF-16", NULL, NULL, NULL);
+        delete[] utf16;
+    }
+#endif
+    if (str) {
+        std::string copy = str;
+        g_free(str);
+        return copy;
+    }
+    g_warning("Couldn't parse text in PDF from UTF16.");
     return "";
 }
 
@@ -738,7 +748,11 @@ void pdf_debug_object(const Object *obj, int depth, XRef *xref)
     } else if (obj->isArray()) {
         pdf_debug_array(obj->getArray(), depth, xref);
     } else if (obj->isString()) {
+#if POPPLER_CHECK_VERSION(26, 4, 0)
+        std::cout << " STR '" << obj->getString().c_str() << "'";
+#else
         std::cout << " STR '" << obj->getString()->getCString() << "'";
+#endif
     } else if (obj->isName()) {
         std::cout << " NAME '" << obj->getName() << "'";
     } else if (obj->isBool()) {

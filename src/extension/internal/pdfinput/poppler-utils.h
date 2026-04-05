@@ -83,6 +83,7 @@ typedef std::shared_ptr<std::map<FontPtr, FontData>> FontList;
 FontList getPdfFonts(std::shared_ptr<PDFDoc> pdf_doc);
 std::string getNameWithoutSubsetTag(std::string name);
 std::string getDictString(Dict *dict, const char *key);
+std::string getString(const std::string &value);
 std::string getString(const std::unique_ptr<GooString> &value);
 std::string getString(const GooString *value);
 std::string validateString(std::string const &in);

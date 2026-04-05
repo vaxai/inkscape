@@ -73,11 +73,11 @@
 #endif
 
 #if POPPLER_CHECK_VERSION(24, 5, 0)
-#define _POPPLER_HAS_UNICODE_BOM(value) (hasUnicodeByteOrderMark(value->toStr()))
-#define _POPPLER_HAS_UNICODE_BOMLE(value) (hasUnicodeByteOrderMarkLE(value->toStr()))
+#define _POPPLER_HAS_UNICODE_BOM(value) (hasUnicodeByteOrderMark(value))
+#define _POPPLER_HAS_UNICODE_BOMLE(value) (hasUnicodeByteOrderMarkLE(value))
 #else
-#define _POPPLER_HAS_UNICODE_BOM(value) (value->hasUnicodeMarker())
-#define _POPPLER_HAS_UNICODE_BOMLE(value) (value->hasUnicodeMarkerLE())
+#define _POPPLER_HAS_UNICODE_BOM(value) (GooString(value).hasUnicodeMarker())
+#define _POPPLER_HAS_UNICODE_BOMLE(value) (GooString(value).hasUnicodeMarkerLE())
 #endif
 
 #if POPPLER_CHECK_VERSION(24, 3, 0)
