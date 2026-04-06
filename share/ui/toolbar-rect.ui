@@ -115,14 +115,10 @@
         <property name="receives-default">True</property>
         <property name="tooltip-text" translatable="yes">Make corners sharp</property>
         <property name="has-frame">False</property>
+        <property name="icon-name">rectangle-make-corners-sharp</property>
         <style>
             <class name="priority1"/>
         </style>
-        <child>
-          <object class="GtkImage" id="image2">
-            <property name="icon-name">rectangle-make-corners-sharp</property>
-          </object>
-        </child>
       </object>
     </child>
     <style>

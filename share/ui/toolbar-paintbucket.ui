@@ -105,14 +105,10 @@
         <property name="receives-default">True</property>
         <property name="tooltip-text" translatable="yes">Reset paint bucket parameters to defaults (use Inkscape Preferences &gt; Tools to change defaults)</property>
         <property name="has-frame">False</property>
+        <property name="icon-name">edit-clear</property>
         <style>
           <class name="priority1"></class>
         </style>
-        <child>
-          <object class="GtkImage" id="image1">
-            <property name="icon-name">edit-clear</property>
-          </object>
-        </child>
       </object>
     </child>
     <style>

@@ -33,11 +33,7 @@
         <property name="action-name">win.shape-builder-mode</property>
         <property name="action-target">0</property>
         <property name="has-frame">False</property>
-        <child>
-          <object class="GtkImage" id="image1">
-            <property name="icon-name">shapebuilder-tool-union</property>
-          </object>
-        </child>
+        <property name="icon-name">shapebuilder-tool-union</property>
       </object>
     </child>
     <child>
@@ -50,11 +46,7 @@
         <property name="action-target">1</property>
         <property name="has-frame">False</property>
         <property name="group">radio_button_group</property>
-        <child>
-          <object class="GtkImage" id="image2">
-            <property name="icon-name">shapebuilder-tool-difference</property>
-          </object>
-        </child>
+        <property name="icon-name">shapebuilder-tool-difference</property>
       </object>
     </child>
     <child>
@@ -76,11 +68,7 @@
         <property name="receives-default">True</property>
         <property name="tooltip-text" translatable="yes">Accept</property>
         <property name="has-frame">False</property>
-        <child>
-          <object class="GtkImage" id="image3">
-            <property name="icon-name">on</property>
-          </object>
-        </child>
+        <property name="icon-name">on</property>
       </object>
     </child>
     <child>
@@ -91,11 +79,7 @@
         <property name="receives-default">True</property>
         <property name="tooltip-text" translatable="yes">Cancel</property>
         <property name="has-frame">False</property>
-        <child>
-          <object class="GtkImage" id="image4">
-            <property name="icon-name">off</property>
-          </object>
-        </child>
+        <property name="icon-name">off</property>
       </object>
     </child>
     <child>
@@ -125,11 +109,7 @@
         <property name="action-name">win.shape-builder-replace</property>
         <property name="has-frame">False</property>
         <property name="use-underline">True</property>
-        <child>
-          <object class="GtkImage" id="image5">
-            <property name="icon-name">layer-delete</property>
-          </object>
-        </child>
+        <property name="icon-name">layer-delete</property>
       </object>
     </child>
     <style>

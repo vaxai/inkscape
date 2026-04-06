@@ -334,14 +334,10 @@
                 <property name="action-name">win.tool-switch</property>
                 <property name="action-target">'Text'</property>
                 <property name="has-frame">False</property>
+                <property name="icon-name">draw-text</property>
                 <style>
                   <class name="square-button"/>
                 </style>
-                <child>
-                  <object class="GtkImage" id="image-text-tool">
-                    <property name="icon-name">draw-text</property>
-                  </object>
-                </child>
               </object>
             </property>
           </object>
