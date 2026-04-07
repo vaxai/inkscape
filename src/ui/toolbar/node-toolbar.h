@@ -79,6 +79,7 @@ private:
     Gtk::ToggleButton *_show_transform_handles_btn;
     Gtk::ToggleButton *_object_edit_mask_path_btn;
     Gtk::ToggleButton *_object_edit_clip_path_btn;
+    Gtk::Button &_add_corners_btn;
 
     UI::Widget::SpinButton &_nodes_x_item;
     UI::Widget::SpinButton &_nodes_y_item;

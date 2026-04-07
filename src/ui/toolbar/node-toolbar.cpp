@@ -64,6 +64,7 @@ NodeToolbar::NodeToolbar(Glib::RefPtr<Gtk::Builder> const &builder)
     , _show_transform_handles_btn{&get_widget<Gtk::ToggleButton>(builder, "_show_transform_handles_btn")}
     , _object_edit_mask_path_btn{&get_widget<Gtk::ToggleButton>(builder, "_object_edit_mask_path_btn")}
     , _object_edit_clip_path_btn{&get_widget<Gtk::ToggleButton>(builder, "_object_edit_clip_path_btn")}
+    , _add_corners_btn{get_widget<Gtk::Button>(builder, "_add_corners_btn")}
     , _nodes_x_item{get_derived_widget<UI::Widget::SpinButton>(builder, "_nodes_x_item")}
     , _nodes_y_item{get_derived_widget<UI::Widget::SpinButton>(builder, "_nodes_y_item")}
     , _nodes_d_item{get_derived_widget<UI::Widget::SpinButton>(builder, "_nodes_d_item")}
@@ -233,6 +234,11 @@ void NodeToolbar::value_changed(Glib::ustring const &name, Glib::RefPtr<Gtk::Adj
 
 void NodeToolbar::sel_changed(Selection *selection)
 {
+    if (is<SPGroup>(selection->singleItem())) {
+        _add_corners_btn.set_sensitive(false);
+    } else {
+        _add_corners_btn.set_sensitive(true);
+    }
     if (auto lpeitem = cast<SPLPEItem>(selection->singleItem())) {
         _nodes_lpeedit_btn.set_sensitive(lpeitem->hasPathEffect());
     } else {

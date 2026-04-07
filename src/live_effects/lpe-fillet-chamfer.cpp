@@ -101,6 +101,7 @@ void LPEFilletChamfer::doOnApply(SPLPEItem const *lpeItem)
         g_warning("LPE Fillet/Chamfer can only be applied to shapes (not groups).");
         SPLPEItem *item = const_cast<SPLPEItem *>(lpeItem);
         item->removeCurrentPathEffect(false);
+        return;
     }
     auto rect = cast<SPRect>(splpeitem);
     Geom::PathVector pathv = pathv_to_linear_and_cubic_beziers(*shape->curve());
