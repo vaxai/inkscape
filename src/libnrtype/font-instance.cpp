@@ -622,7 +622,7 @@ Glib::ustring FontInstance::SvgDocument(unsigned int glyph_id)
 {
     auto glyph_iter = data->openTypeSVGGlyphs.find(glyph_id);
     if (glyph_iter == data->openTypeSVGGlyphs.end()) {
-        return nullptr; // out of range
+        return Glib::ustring(); // out of range
     }
 
     // Glyphs are layed out in the +x, -y quadrant (assuming viewBox origin is 0,0).

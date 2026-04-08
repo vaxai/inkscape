@@ -54,17 +54,23 @@ std::shared_ptr<Pixbuf> DrawingGlyphs::_get_svg_glyph(std::shared_ptr<FontInstan
         return res;
     }
 
+    Inkscape::Pixbuf* pixbuf = nullptr;
     auto svg = font->SvgDocument(glyph_id);
-    std::unique_ptr<Inkscape::Pixbuf> pixbuf(Pixbuf::create_from_buffer(svg.raw()));
+    if (!svg.empty()) {
+        pixbuf = Pixbuf::create_from_buffer(svg.raw());
+        if (!pixbuf) {
+            std::cerr << "Bad svg data for glyph " << glyph_id << "\n";
+        }
+    }
     if (!pixbuf) {
-        std::cerr << "Bad svg data for glyph " << glyph_id << "\n";
-        pixbuf = std::make_unique<Pixbuf>(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1));
+        // Either no glyph for Unicode point or glyph had bad SVG data.
+        pixbuf = new Pixbuf(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1));
     }
 
     // Ensure exists in cairo format before locking it down. (Rendering code requires cairo format.)
     pixbuf->ensurePixelFormat(Pixbuf::PF_CAIRO);
 
-    _svg_glyph_cache.add(key, std::move(pixbuf));
+    _svg_glyph_cache.add(key, std::unique_ptr<Pixbuf>(pixbuf));
 
     return _svg_glyph_cache.lookup(key);
 }
