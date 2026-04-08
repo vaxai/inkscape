@@ -16,12 +16,15 @@
 
 #include "canvas-item-text.h"
 
-#include <cmath>
+#include <pangomm/fontdescription.h>
+#include <pangomm/layout.h>
+#include <pangomm/rectangle.h>
 #include <utility> // std::move
 #include <glibmm/i18n.h>
 
 #include "display/cairo-utils.h"
 #include "ui/util.h"
+#include "util/units.h"
 
 namespace Inkscape {
 
@@ -154,14 +157,20 @@ void CanvasItemText::_render(Inkscape::CanvasItemBuffer &buf) const
     }
 
     // Center the text inside the draw background box
+    // To truly center text: offset
+    // descent (A top to j bottom) minus font size (A top to baseline)
     auto bx = x + w / 2.0;
-    auto by = y + h / 2.0 + 1;
-    buf.cr->move_to(int(bx - _text_size.x_bearing - _text_size.width/2.0),
-                    int(by - _text_size.y_bearing - _text_extent.height/2.0));
+    auto by = y + h / 2.0;
+    buf.cr->move_to(int(bx - _text_extents.get_width()/2.0),
+                    int(by - _border - (_text_extents.get_descent() - _fontsize)));
 
-    buf.cr->select_font_face(_fontname, Cairo::ToyFontFace::Slant::NORMAL, Cairo::ToyFontFace::Weight::NORMAL);
-    buf.cr->set_font_size(_fontsize);
-    buf.cr->text_path(_text);
+    // Call Pango to draw text with fallback fonts
+    auto layout = Pango::Layout::create(buf.cr);
+    auto desc_str = Glib::ustring::compose("%1 %2", _fontname, _fontsize_pt);
+    layout->set_font_description(Pango::FontDescription(desc_str));
+    layout->set_text(_text);
+    buf.cr->set_source_rgb(1.0, 1.0, 1.0); // Explicitly set color
+    layout->show_in_cairo_context(buf.cr);
 
     ink_cairo_set_source_color(buf.cr, Colors::Color(_fill));
     buf.cr->fill();
@@ -177,10 +186,19 @@ void CanvasItemText::set_text(Glib::ustring text)
     });
 }
 
+/**
+ * Set the font size.
+ *
+ * @param fontsize  Font size in px.
+ */
 void CanvasItemText::set_fontsize(double fontsize)
 {
+    // Historically we assume that the passed in value is px.
+    // However, Pango uses pt for its font size unit, so we convert it here.
     defer([=, this] {
-        if (_fontsize == fontsize) return;
+        double fontsize_pt = Util::Quantity::convert(fontsize, "px", "pt");
+        if (_fontsize_pt == fontsize_pt) return;
+        _fontsize_pt = fontsize_pt;
         _fontsize = fontsize;
         request_update(); // Might be larger than before!
     });
@@ -188,8 +206,8 @@ void CanvasItemText::set_fontsize(double fontsize)
 
 Geom::Rect CanvasItemText::get_text_size() const {
     return Geom::Rect::from_xywh(0, 0,
-                                 _text_size.x_advance + _border * 2,
-                                 _text_extent.height + _border * 2);
+                                 _text_extents.get_width() + _border * 2,
+                                 _fontsize + _border * 2);
 }
 
 /**
@@ -199,20 +217,17 @@ Geom::Rect CanvasItemText::load_text_extents()
 {
     auto surface = Cairo::ImageSurface::create(Cairo::Surface::Format::ARGB32, 1, 1);
     auto context = Cairo::Context::create(surface);
-    context->select_font_face(_fontname, Cairo::ToyFontFace::Slant::NORMAL, Cairo::ToyFontFace::Weight::NORMAL);
-    context->set_font_size(_fontsize);
-    context->get_text_extents(_text, _text_size);
 
-    if (_fixed_line) {
-        // TRANSLATORS: This is a set of letters to test for font ascender and descenders.
-        context->get_text_extents(_("lg1p$"), _text_extent);
-    } else {
-        _text_extent = _text_size;
-    }
+    // Call Pango to draw text with fallback fonts
+    auto layout = Pango::Layout::create(context);
+    auto desc_str = Glib::ustring::compose("%1 %2", _fontname, _fontsize_pt);
+    layout->set_font_description(Pango::FontDescription(desc_str));
+    layout->set_text(_text);
+    _text_extents = layout->get_pixel_logical_extents();
 
     return Geom::Rect::from_xywh(0, 0,
-                                 _text_size.x_advance + _border * 2,
-                                 _text_extent.height + _border * 2);
+                                 _text_extents.get_width() + _border * 2,
+                                 _fontsize + _border * 2);
 }
 
 void CanvasItemText::set_background(uint32_t background)
@@ -243,15 +258,6 @@ void CanvasItemText::set_adjust(Geom::Point const &adjust_pt)
     defer([=, this] {
         if (_adjust_offset == adjust_pt) return;
         _adjust_offset = adjust_pt;
-        request_update();
-    });
-}
-
-void CanvasItemText::set_fixed_line(bool fixed_line)
-{
-    defer([=, this] {
-        if (_fixed_line == fixed_line) return;
-        _fixed_line = fixed_line;
         request_update();
     });
 }

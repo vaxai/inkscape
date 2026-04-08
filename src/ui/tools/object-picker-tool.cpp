@@ -26,7 +26,6 @@ ObjectPickerTool::ObjectPickerTool(SPDesktop* desktop): ToolBase(desktop, "/tool
     _label->set_fill(0x000000'ff); // black text
     _label->set_background(0xffffff'bf); // white with some transparency
     _label->set_border(4);
-    _label->set_fixed_line(true);
     _label->set_visible(false);
 
     _frame->set_shadow(0x00000020, 1);

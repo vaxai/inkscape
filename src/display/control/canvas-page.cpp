@@ -59,7 +59,6 @@ void CanvasPage::add(Geom::Rect size, CanvasItemGroup *background_group, CanvasI
     }
 
     if (auto label = new CanvasItemText(border_group, Geom::Point(0, 0), "{Page Label}")) {
-        label->set_fixed_line(false);
         canvas_items.emplace_back(label);
     }
 }

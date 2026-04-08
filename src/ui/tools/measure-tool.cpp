@@ -1204,6 +1204,7 @@ void MeasureTool::setMeasureCanvasText(bool is_angle, double precision, double a
     if (!label.empty()) { measure = label + ": " + measure; }
     auto canvas_tooltip = new Inkscape::CanvasItemText(_desktop->getCanvasTemp(), position, measure);
     canvas_tooltip->set_fontsize(fontsize);
+    canvas_tooltip->set_border(_tooltip_border_size);
     canvas_tooltip->set_fill(0xffffffff);
     canvas_tooltip->set_background(background);
     if (to_left) {
@@ -1271,10 +1272,10 @@ void MeasureTool::addCanvasItemText(std::vector<CanvasItemPtr<CanvasItem>> &item
 {
     auto canvas_tooltip = make_canvasitem<CanvasItemText>(_desktop->getCanvasTemp(), pos, measure_str);
     canvas_tooltip->set_fontsize(fontsize);
+    canvas_tooltip->set_border(_tooltip_border_size);
     canvas_tooltip->set_fill(0xffffffff);
     canvas_tooltip->set_background(0x00000099);
     canvas_tooltip->set_anchor(Geom::Point());
-    canvas_tooltip->set_fixed_line(true);
     canvas_tooltip->set_visible(true);
     canvas_tooltip->set_anchor(anchor);
     items.emplace_back(std::move(canvas_tooltip));
@@ -1410,7 +1411,10 @@ void MeasureTool::showInfoBox(Geom::Point cursor, bool into_groups)
         Geom::Point rel_position = Geom::Point(origin, origin + yaxis_shift);
         /* Keeps infobox just above the cursor */
         Geom::Point pos = _desktop->w2d(cursor);
-        double gap = Quantity::convert(7 + fontsize, "px", unit->abbr);
+
+        // To have a sufficient gap the formula is 2 * tooltip border size + font size in px.
+        // Add 1 for good measure.
+        double gap = Quantity::convert(2 * _tooltip_border_size + 1 + fontsize, "px", unit->abbr);
 
         auto measurement = [precision, unit_name](std::string const &label, double num) {
             return ustring::format_classic(label, ": ", Util::format_number(num, precision), unit_name);

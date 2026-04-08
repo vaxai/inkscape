@@ -243,6 +243,7 @@ private:
     double curve_length;
     double segment_length;
     double corner_angle;
+    double _tooltip_border_size = 3.0;
     SPItem *over;
     std::unique_ptr<PathMeasure> pathmeasure;
     sigc::scoped_connection _knot_start_moved_connection;

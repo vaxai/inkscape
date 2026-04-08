@@ -68,6 +68,7 @@ protected:
 
     static constexpr uint32_t CONTROL_LOCKED_COLOR = 0x00000080; // RGBA black semitranslucent
     static constexpr double LABEL_SEP = 2.0; // Distance between the label and the origin control
+    static constexpr int FONT_SIZE = 8;
 };
 
 // A handle ("dot") serving as draggable origin control
