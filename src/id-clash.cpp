@@ -17,11 +17,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <list>
-#include <map>
 #include <string>
 #include <utility>
 #include <glibmm/i18n.h>
 #include <glibmm/regex.h>
+#include <unordered_map>
 
 #include "attributes.h"                              // for SPAttr
 #include "document.h"                                // for SPDocument
@@ -46,7 +46,7 @@ struct IdReference {
     const char *attr;  // property or href-like attribute
 };
 
-typedef std::map<Glib::ustring, std::list<IdReference> > refmap_type;
+typedef std::unordered_map<std::string, std::list<IdReference> > refmap_type;
 
 typedef std::pair<SPObject*, Glib::ustring> id_changeitem_type;
 typedef std::list<id_changeitem_type> id_changelist_type;
