@@ -2073,7 +2073,7 @@ void OdfOutput::save(Inkscape::Extension::Output */*mod*/, SPDocument *doc, gcha
 
 
 /**
- * This is the definition of PovRay output.  This function just
+ * This is the definition of OpenDocument Drawing output.  This function just
  * calls the extension system with the memory allocated XML that
  * describes the data.
 */
@@ -2086,7 +2086,7 @@ void OdfOutput::init()
             "<id>org.inkscape.output.odf</id>\n"
             "<output>\n"
                 "<extension>.odg</extension>\n"
-                "<mimetype>text/x-povray-script</mimetype>\n"
+                "<mimetype>application/vnd.oasis.opendocument.graphics</mimetype>\n"
                 "<filetypename>" N_("OpenDocument drawing (*.odg)") "</filetypename>\n"
                 "<filetypetooltip>" N_("OpenDocument drawing file") "</filetypetooltip>\n"
             "</output>\n"
