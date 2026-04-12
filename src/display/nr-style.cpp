@@ -41,7 +41,7 @@ void NRStyleData::Paint::set(SPPaintServer *ps)
     clear();
     if (ps) {
         type = PaintType::SERVER;
-        server = ps->create_drawing_paintserver();
+        server = create_drawing_paintserver(ps);
     }
 }
 

@@ -568,7 +568,6 @@ SPMeshNodeArray::SPMeshNodeArray(SPMeshNodeArray const &rhs)
     nodes(rhs.nodes) // This only copies the pointers but it does size the vector of vectors.
 {
     built = false;
-    mg = nullptr;
 
     for( unsigned i=0; i < nodes.size(); ++i ) {
         for( unsigned j=0; j < nodes[i].size(); ++j ) {
@@ -586,7 +585,6 @@ SPMeshNodeArray &SPMeshNodeArray::operator=(SPMeshNodeArray const &rhs)
     clear(); // Clear any existing array.
 
     built = false;
-    mg = nullptr;
 
     nodes = rhs.nodes; // This only copies the pointers but it does size the vector of vectors.
 
@@ -629,9 +627,9 @@ void SPMeshNodeArray::update_node_vectors()
 
 // Fill array with data from mesh objects.
 // Returns true if array's dimensions unchanged.
-bool SPMeshNodeArray::read(SPMeshGradient *mg_in)
+bool SPMeshNodeArray::read(SPMeshGradient const *mg_in)
 {
-    mg = mg_in;
+    auto mg = mg_in;
     auto mg_array = cast<SPMeshGradient>(mg->getArray());
     if (!mg_array) {
         std::cerr << "SPMeshNodeArray::read: No mesh array!" << std::endl;
@@ -804,7 +802,7 @@ bool SPMeshNodeArray::read(SPMeshGradient *mg_in)
                             } else {
                                 auto color = stop->getColor();
                                 new_patch.setColor( istop, color );
-                                new_patch.setStopPtr( istop, stop );
+                                new_patch.setStopPtr( istop, const_cast<SPStop *>(stop) );
                             }
                             ++istop;
                         }
@@ -2200,7 +2198,7 @@ unsigned SPMeshNodeArray::color_smooth(std::vector<unsigned> const &corners)
 /**
    Pick color from background for selected corners.
 */
-unsigned SPMeshNodeArray::color_pick(std::vector<unsigned> const &icorners, SPItem * const item)
+unsigned SPMeshNodeArray::color_pick(std::vector<unsigned> const &icorners, SPGradient *mg, SPItem * const item)
 {
     // std::cout << "SPMeshNodeArray::color_pick" << std::endl;
 
@@ -2214,7 +2212,7 @@ unsigned SPMeshNodeArray::color_pick(std::vector<unsigned> const &icorners, SPIt
     Inkscape::Drawing *pick_drawing = new Inkscape::Drawing();
     unsigned pick_visionkey = SPItem::display_key_new(1);
 
-    SPDocument *pick_doc = mg->document;
+    SPDocument *pick_doc = item->document;
 
     pick_drawing->setRoot(pick_doc->getRoot()->invoke_show(*pick_drawing, pick_visionkey, SP_ITEM_SHOW_DISPLAY));
 
@@ -2695,7 +2693,7 @@ void SPMeshNodeArray::transform(Geom::Affine const &m) {
 }
 
 // Transform mesh to fill box. Return true if mesh transformed.
-bool SPMeshNodeArray::fill_box(Geom::OptRect &box) {
+bool SPMeshNodeArray::fill_box(SPMeshGradient *mg, Geom::OptRect &box) {
 
     // If gradientTransfor is set (as happens when an object is transformed
     // with the "optimized" preferences set true), we need to remove it.

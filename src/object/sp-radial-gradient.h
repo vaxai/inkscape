@@ -34,7 +34,8 @@ public:
     SVGLength fy;
     SVGLength fr; // Focus radius. Added in SVG 2
 
-    std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver() override;
+    PaintServerType getPaintType() const override { return PaintServerType::RADIAL_GRADIENT; }
+    std::vector<double> getGradientGeom() const override;
 
 protected:
     void build(SPDocument *document, Inkscape::XML::Node *repr) override;

@@ -70,11 +70,9 @@ Inkscape::XML::Node* SPSolidColor::write(Inkscape::XML::Document* xml_doc, Inksc
     return repr;
 }
 
-std::unique_ptr<Inkscape::DrawingPaintServer> SPSolidColor::create_drawing_paintserver()
+Inkscape::Colors::Color const SPSolidColor::getSolidColor() const
 {
-    auto color = style->solid_color.getColor();
-    color.addOpacity(style->solid_opacity);
-    return std::make_unique<Inkscape::DrawingSolidColor>(color);
+    return style->solid_color.getColor().withOpacity(style->solid_opacity);
 }
 
 /*

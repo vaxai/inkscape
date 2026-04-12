@@ -237,7 +237,7 @@ namespace XML {}
  *     - SPMask [\ref sp-mask.cpp, \ref sp-mask.h]
  *     - SPNamedView [\ref sp-namedview.cpp, \ref sp-namedview.h]
  *   - SPPaintServer [\ref sp-paint-server.cpp, \ref sp-paint-server.h]
- *     - SPGradient [\ref sp-gradient.cpp, \ref sp-gradient.h, \ref gradient-chemistry.cpp, \ref sp-gradient-reference.h, \ref sp-gradient-spread.h, \ref sp-gradient-units.h, \ref sp-gradient-vector.h]
+ *     - SPGradient [\ref sp-gradient.cpp, \ref sp-gradient.h, \ref gradient-chemistry.cpp, \ref sp-gradient-reference.h, \ref sp-paint-server-data.h]
  *       - SPLinearGradient
  *       - SPRadialGradient
  *     - SPPattern [\ref sp-pattern.cpp, \ref sp-pattern.h]

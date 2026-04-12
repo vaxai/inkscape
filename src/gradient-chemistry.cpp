@@ -471,7 +471,7 @@ SPGradient *sp_gradient_convert_to_userspace(SPGradient *gr, SPItem *item, gchar
     } else if (is<SPRadialGradient>(gr)) {
         gr = sp_gradient_fork_private_if_necessary(gr, gr->getVector(), SP_GRADIENT_TYPE_RADIAL, item);
     } else {
-        gr = sp_gradient_fork_private_if_necessary(gr, gr->getArray(),  SP_GRADIENT_TYPE_MESH,   item);
+        gr = sp_gradient_fork_private_if_necessary(gr, const_cast<SPGradient *>(gr->getArray()),  SP_GRADIENT_TYPE_MESH,   item);
     }
 
     if (gr->getUnits() == SP_GRADIENT_UNITS_OBJECTBOUNDINGBOX) {
@@ -1986,7 +1986,7 @@ void sp_item_apply_mesh(SPItem* item, SPGradient* mesh, SPDocument* document, Fi
         mesh_gradient->array.read(mesh_gradient);
 
         Geom::OptRect item_bbox = kind == FILL ? item->geometricBounds() : item->visualBounds();
-        mesh_gradient->array.fill_box(item_bbox);
+        mesh_gradient->array.fill_box(mesh_gradient, item_bbox);
     }
 
     sp_style_set_property_url(item, kind == FILL ? "fill" : "stroke", mesh_gradient, is<SPText>(item));

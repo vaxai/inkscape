@@ -55,13 +55,13 @@ bool gradient_has_transparency(SPPaintServer const *paint)
         return false;
 
     if (auto linear = cast<SPLinearGradient>(paint)) {
-        for (auto &stop : linear->getGradientVector().stops) {
+        for (auto &stop : linear->getGradientVector()->stops) {
             if (stop.color->getOpacity() < 1.0) {
                 return true;
             }
         }
     } else if (auto radial = cast<SPRadialGradient>(paint)) {
-        for (auto &stop : radial->getGradientVector().stops) {
+        for (auto &stop : radial->getGradientVector()->stops) {
             if (stop.color->getOpacity() < 1.0) {
                 return true;
             }
@@ -154,7 +154,7 @@ std::optional<CapyPDF_PatternId> Document::get_linear_pattern(SPLinearGradient c
         cm *= to_userspace;
     }
 
-    if (auto func = get_gradient_function(linear->getGradientVector(), opacity, &color_space)) {
+    if (auto func = get_gradient_function(*linear->getGradientVector(), opacity, &color_space)) {
         auto d1 = 0.0;
         auto d2 = 1.0;
 
@@ -221,7 +221,7 @@ std::optional<CapyPDF_PatternId> Document::get_radial_pattern(SPRadialGradient c
         cm *= to_userspace;
     }
 
-    if (auto func = get_gradient_function(radial->getGradientVector(), opacity, &color_space)) {
+    if (auto func = get_gradient_function(*radial->getGradientVector(), opacity, &color_space)) {
         double d1 = 0.0;
         double d2 = 1.0;
 

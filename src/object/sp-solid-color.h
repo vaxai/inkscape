@@ -26,7 +26,8 @@ public:
     ~SPSolidColor() override;
     int tag() const override { return tag_of<decltype(*this)>; }
 
-    std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver() override;
+    PaintServerType getPaintType() const override { return PaintServerType::SOLID_COLOR; }
+    Inkscape::Colors::Color const getSolidColor() const override;
 
     void update(SPCtx *ctx, guint flags) override;
 

@@ -716,12 +716,15 @@ void SPGradient::ensureVector()
     }
 }
 
-SPGradientVector const &SPGradient::getGradientVector() const
+SPGradientVector const *SPGradient::getGradientVector() const
 {
     if (!vector.built) {
         rebuildVector();
     }
-    return vector;
+    // NOTE: This is to maintain previous logic when geometry was outside of the vector
+    // and so wasn't included in the cache invalidation. Move to rebuildVector() if pos.
+    vector.geom = getGradientGeom();
+    return &vector;
 }
 
 /**
@@ -729,12 +732,23 @@ SPGradientVector const &SPGradient::getGradientVector() const
  *
  * \pre is<SPGradient>(gradient).
  */
-void SPGradient::ensureArray()
+void SPGradient::ensureArray() const
 {
     //std::cout << "SPGradient::ensureArray()" << std::endl;
     if ( !array.built ) {
         rebuildArray();
     }
+}
+
+SPGradientMesh const *SPGradient::getGradientMesh() const
+{
+    if (!mesh.built) {
+        rebuildArray();
+        mesh.rows = array.patch_rows();
+        mesh.cols = array.patch_columns();
+        mesh.patches = getGradientPatches();
+    }
+    return &mesh;
 }
 
 /**
@@ -850,13 +864,13 @@ SPGradient *SPGradient::getVector(bool force_vector)
     return src;
 }
 
-SPGradient *SPGradient::getArray(bool force_vector)
+SPGradient *SPGradient::getArray(bool force_vector) const
 {
-    SPGradient * src = chase_hrefs(this, has_patchesFN);
+    SPGradient const * src = chase_hrefs(const_cast<SPGradient *>(this), has_patchesFN);
     if (src == nullptr) {
         src = this;
     }
-    return src;
+    return const_cast<SPGradient *>(src);
 }
 
 /**
@@ -1073,7 +1087,7 @@ void SPGradient::rebuildVector() const
 }
 
 /** Creates normalized color mesh patch array */
-void SPGradient::rebuildArray()
+void SPGradient::rebuildArray() const
 {
     // std::cout << "SPGradient::rebuildArray()" << std::endl;
 

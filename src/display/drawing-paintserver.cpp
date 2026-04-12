@@ -5,8 +5,28 @@
 
 #include "cairo-utils.h"
 #include "colors/color.h"
+#include "object/sp-paint-server.h"
 
 namespace Inkscape {
+
+std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver(SPPaintServer *ps)
+{
+    switch (ps->getPaintType()) {
+        case PaintServerType::SOLID_COLOR:
+            return std::make_unique<Inkscape::DrawingSolidColor>(ps->getSolidColor());
+            break;
+        case PaintServerType::LINEAR_GRADIENT:
+            return std::make_unique<Inkscape::DrawingLinearGradient>(ps->getSpread(), ps->getUnits(), ps->getGradientTransform(), ps->getGradientVector());
+            break;
+        case PaintServerType::RADIAL_GRADIENT:
+            return std::make_unique<Inkscape::DrawingRadialGradient>(ps->getSpread(), ps->getUnits(), ps->getGradientTransform(), ps->getGradientVector());
+            break;
+        case PaintServerType::MESH_GRADIENT:
+            return std::make_unique<Inkscape::DrawingMeshGradient>(ps->getSpread(), ps->getUnits(), ps->getGradientTransform(), ps->getGradientMesh());
+            break;
+    }
+    return {};
+}
 
 DrawingPaintServer::~DrawingPaintServer() = default;
 

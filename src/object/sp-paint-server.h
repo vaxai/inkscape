@@ -22,11 +22,15 @@
 #include <sigc++/slot.h>
 #include "sp-object.h"
 
+#include "object/sp-paint-server-data.h"
+
 namespace Inkscape {
 class Drawing;
 class DrawingPattern;
 class DrawingPaintServer;
 } // namespace Inkscape
+
+using namespace Inkscape;
 
 class SPPaintServer
     : public SPObject
@@ -39,21 +43,18 @@ public:
     bool isSwatch() const;
     virtual bool isValid() const;
 
-    /*
-     * There are two ways to implement a paint server:
-     *
-     *  1. Simple paint servers (solid colors and gradients) implement the create_drawing_paintserver() method.
-     *     This returns a DrawingPaintServer instance holding a copy of the paint server's resources which is
-     *     used to produce a pattern on-demand using create_pattern().
-     *
-     *  2. The other paint servers (patterns and hatches) implement set_visible(true), set_visible(false) and setBBox().
-     *     The drawing item subtree returned by set_visible(true) is attached as a fill/stroke child of the
-     *     drawing item the paint server is applied to, and used directly when rendering.
-     *
-     *  Paint servers only need to implement one method. If both are implemented, then option 2 is used.
-     */
+    // Informs the renderer which of the rendering data functions will return valid data
+    // Must always return because of how sp-object works this can't be = 0
+    virtual PaintServerType getPaintType() const { return PaintServerType::INVALID; }
 
-    virtual std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver();
+    // Provide the paint server rendering data in a neutral format that rendering
+    // code can consume without needing to import sp-object (and limit unit testing)
+    virtual Colors::Color    const  getSolidColor() const { return Colors::Color(0x0); }
+    virtual SPGradientMesh   const *getGradientMesh() const { return nullptr; }
+    virtual SPGradientVector const *getGradientVector() const { return nullptr; }
+    virtual SPGradientSpread getSpread() const { return SP_GRADIENT_SPREAD_UNDEFINED; }
+    virtual SPGradientUnits  getUnits() const { return SP_GRADIENT_UNITS_OBJECTBOUNDINGBOX; }
+    virtual Geom::Affine     getGradientTransform() const { return Geom::identity(); }
 
     virtual Inkscape::DrawingPattern *show(Inkscape::Drawing &drawing, unsigned key, Geom::OptRect const &bbox);
     virtual void hide(unsigned key);

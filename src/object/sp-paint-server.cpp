@@ -55,11 +55,6 @@ void SPPaintServer::setBBox(unsigned key, Geom::OptRect const &bbox)
 {
 }
 
-std::unique_ptr<Inkscape::DrawingPaintServer> SPPaintServer::create_drawing_paintserver()
-{
-    return {};
-}
-
 /*
   Local Variables:
   mode:c++

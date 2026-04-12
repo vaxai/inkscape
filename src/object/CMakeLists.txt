@@ -113,9 +113,6 @@ target_sources(inkscape_base PRIVATE
   sp-glyph-kerning.h
   sp-glyph.h
   sp-gradient-reference.h
-  sp-gradient-spread.h
-  sp-gradient-units.h
-  sp-gradient-vector.h
   sp-gradient.h
   sp-grid.h
   sp-guide.h
@@ -142,6 +139,7 @@ target_sources(inkscape_base PRIVATE
   sp-object-iterator.h
   sp-object.h
   sp-offset.h
+  sp-paint-server-data.h
   sp-paint-server-reference.h
   sp-paint-server.h
   sp-page.h

@@ -70,6 +70,8 @@ public:
     ~SPHatch() override;
     int tag() const override { return tag_of<decltype(*this)>; }
 
+    PaintServerType getPaintType() const override { return PaintServerType::HATCH_PATTERN; }
+
     // Reference (href)
     Glib::ustring href;
     SPHatchReference ref;

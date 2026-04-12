@@ -1274,7 +1274,7 @@ CairoRenderContext::_createPatternForPaintServer(SPPaintServer const *const pain
             ink_cairo_pattern_add_color_stop(pattern, rg->vector.stops[i].offset, *rg->vector.stops[i].color, alpha);
         }
     } else if (auto mg = cast<SPMeshGradient>(paintserver_mutable)) {
-        pattern = mg->create_drawing_paintserver()->create_pattern(_cr, pbox, 1.0);
+        pattern = Inkscape::create_drawing_paintserver(mg)->create_pattern(_cr, pbox, 1.0);
     } else if (is<SPPattern>(paintserver)) {
         pattern = _createPatternPainter(paintserver, pbox);
     } else if (is<SPHatch>(paintserver) ) {

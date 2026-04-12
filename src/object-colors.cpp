@@ -373,7 +373,7 @@ void ColorsExtractor::extractGradientStops(SPObject *object, bool isFill)
         } else if (is<SPRadialGradient>(gradient)) {
             type = ObjectStyleType::Radial;
         }
-        for (auto stop : gradient->getGradientVector().stops) {
+        for (auto stop : gradient->getGradientVector()->stops) {
             if (stop.color.has_value()) {
                 manager.populateMap(stop.color.value(), object, type, "stop");
             }

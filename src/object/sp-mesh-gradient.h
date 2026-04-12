@@ -29,7 +29,8 @@ public:
     SPMeshType type;
     bool type_set;
 
-    std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver() override;
+    PaintServerType getPaintType() const override { return PaintServerType::MESH_GRADIENT; }
+    std::vector<std::vector<SPGradientPatch>> getGradientPatches() const override;
 
 protected:
     void build(SPDocument *document, Inkscape::XML::Node *repr) override;

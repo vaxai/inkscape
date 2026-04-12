@@ -22,9 +22,7 @@
 #include <2geom/affine.h>
 
 #include "sp-paint-server.h"
-#include "sp-gradient-spread.h"
-#include "sp-gradient-units.h"
-#include "sp-gradient-vector.h"
+#include "sp-paint-server-data.h"
 #include "sp-mesh-array.h"
 
 class SPGradientReference;
@@ -99,6 +97,8 @@ public:
     Geom::Affine gradientTransform;
     unsigned int gradientTransform_set : 1;
 
+    Geom::Affine getGradientTransform() const override { return gradientTransform; }
+
 private:
     /** spreadMethod attribute */
     SPGradientSpread spread;
@@ -108,7 +108,7 @@ private:
     unsigned int has_stops : 1;
 
     /** Gradient patches */
-    unsigned int has_patches : 1;
+    mutable unsigned int has_patches : 1;
 
     /** Pinned in swatches dialog */
     bool _pinned = false;
@@ -124,7 +124,8 @@ public:
 
     /** Composed vector */
     mutable SPGradientVector vector;
-    SPGradientVector const &getGradientVector() const;
+    SPGradientVector const *getGradientVector() const override;
+    virtual std::vector<double> getGradientGeom() const { return {}; }
 
     sigc::connection modified_connection;
 
@@ -136,23 +137,26 @@ public:
     bool isEquivalent(SPGradient *b);
     bool isAligned(SPGradient *b);
 
+    mutable SPGradientMesh mesh;
+    SPGradientMesh const *getGradientMesh() const override;
+    virtual std::vector<std::vector<SPGradientPatch>> getGradientPatches() const { return {}; }
+
     /** Mesh Gradients **************/
 
     /** Composed array (for mesh gradients) */
-    SPMeshNodeArray array;
-    SPMeshNodeArray array_smoothed; // Smoothed version of array
+    mutable SPMeshNodeArray array;
+    mutable SPMeshNodeArray array_smoothed; // Smoothed version of array
     
     bool hasPatches() const;
 
-
     /** All Gradients **************/
     bool isUnitsSet() const;
-    SPGradientUnits getUnits() const;
+    SPGradientUnits getUnits() const override;
     void setUnits(SPGradientUnits units);
 
 
     bool isSpreadSet() const;
-    SPGradientSpread getSpread() const;
+    SPGradientSpread getSpread() const override;
 
 /**
  * Returns private vector of given gradient (the gradient at the end of the href chain which has
@@ -171,7 +175,7 @@ public:
  * Returns private mesh of given gradient (the gradient at the end of the href chain which has
  * patches), optionally normalizing it.
  */
-    SPGradient *getArray(bool force_private = false);
+    SPGradient *getArray(bool force_private = false) const;
 
     //static GType getType();
 
@@ -179,7 +183,7 @@ public:
     void ensureVector();
 
     /** Forces array (mesh) to be built, if not present (i.e. changed) */
-    void ensureArray();
+    void ensureArray() const;
 
     /**
      * Set spread property of gradient and emit modified.
@@ -220,7 +224,7 @@ private:
     bool invalidateVector();
     bool invalidateArray();
     void rebuildVector() const;
-    void rebuildArray();
+    void rebuildArray() const;
 
 protected:
     void build(SPDocument *document, Inkscape::XML::Node *repr) override;

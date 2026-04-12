@@ -289,7 +289,7 @@ void MeshTool::corner_operation(MeshCornerOperation operation)
 
                 case MG_CORNER_COLOR_PICK:
                     // std::cout << "COLOR_PICK" << std::endl;
-                    noperation += mg->array.color_pick( iter->second, items[iter->first] );
+                    noperation += mg->array.color_pick( iter->second, mg, items[iter->first] );
                     break;
 
                 case MG_CORNER_INSERT:
@@ -375,7 +375,7 @@ void MeshTool::fit_mesh_in_bbox()
 
                     Geom::OptRect item_bbox = item->geometricBounds();
                     auto gradient = cast<SPMeshGradient>(server);
-                    if (gradient->array.fill_box( item_bbox )) {
+                    if (gradient->array.fill_box(gradient, item_bbox)) {
                         changed = true;
                     }
                 }
@@ -387,7 +387,7 @@ void MeshTool::fit_mesh_in_bbox()
 
                     Geom::OptRect item_bbox = item->visualBounds();
                     auto gradient = cast<SPMeshGradient>(server);
-                    if (gradient->array.fill_box( item_bbox )) {
+                    if (gradient->array.fill_box(gradient, item_bbox)) {
                         changed = true;
                     }
                 }

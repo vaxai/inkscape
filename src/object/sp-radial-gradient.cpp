@@ -15,11 +15,10 @@
 #include "style.h"                        // for SPStyle
 
 #include "display/drawing-paintserver.h"  // for DrawingRadialGradient, Draw...
-#include "object/sp-gradient-units.h"     // for SPGradientUnits
-#include "object/sp-gradient-vector.h"    // for SPGradientVector
 #include "object/sp-gradient.h"           // for SPGradient
 #include "object/sp-item.h"               // for SPItemCtx
 #include "object/sp-object.h"             // for SP_OBJECT_MODIFIED_FLAG
+#include "object/sp-paint-server-data.h"  // for SPGradientVector, SPGradientUnits
 #include "style-internal.h"               // for SPIFontSize
 #include "xml/document.h"                 // for Document
 #include "xml/node.h"                     // for Node
@@ -185,11 +184,9 @@ Inkscape::XML::Node* SPRadialGradient::write(Inkscape::XML::Document *xml_doc, I
     return repr;
 }
 
-std::unique_ptr<Inkscape::DrawingPaintServer> SPRadialGradient::create_drawing_paintserver()
+std::vector<double> SPRadialGradient::getGradientGeom() const
 {
-    ensureVector();
-    return std::make_unique<Inkscape::DrawingRadialGradient>(getSpread(), getUnits(), gradientTransform,
-                                                             fx.computed, fy.computed, cx.computed, cy.computed, r.computed, fr.computed, vector.stops);
+    return {cx.computed, cy.computed, r.computed, fx.computed, fy.computed, fr.computed};
 }
 
 /*

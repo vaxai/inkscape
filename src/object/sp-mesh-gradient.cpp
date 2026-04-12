@@ -154,10 +154,8 @@ Inkscape::XML::Node* SPMeshGradient::write(Inkscape::XML::Document *xml_doc, Ink
     return repr;
 }
 
-std::unique_ptr<Inkscape::DrawingPaintServer> SPMeshGradient::create_drawing_paintserver()
+std::vector<std::vector<SPGradientPatch>> SPMeshGradient::getGradientPatches() const
 {
-    ensureArray();
-
     SPMeshNodeArray* my_array = &array;
 
     if (type_set) {
@@ -175,7 +173,7 @@ std::unique_ptr<Inkscape::DrawingPaintServer> SPMeshGradient::create_drawing_pai
     int rows = my_array->patch_rows();
     int cols = my_array->patch_columns();
 
-    std::vector<std::vector<Inkscape::DrawingMeshGradient::PatchData>> patchdata;
+    std::vector<std::vector<SPGradientPatch>> patchdata;
     patchdata.resize(rows);
     for (auto &row : patchdata) {
         row.resize(cols);
@@ -219,7 +217,5 @@ std::unique_ptr<Inkscape::DrawingPaintServer> SPMeshGradient::create_drawing_pai
             }
         }
     }
-
-    return std::make_unique<Inkscape::DrawingMeshGradient>(getSpread(), getUnits(), gradientTransform,
-                                                           rows, cols, std::move(patchdata));
+    return patchdata;
 }

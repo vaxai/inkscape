@@ -139,7 +139,6 @@ class SPMeshGradient;
 class SPMeshNodeArray {
 // Should be private
 public:
-  SPMeshGradient *mg;
   std::vector< std::vector< SPMeshNode* > > nodes;
 
 public:
@@ -150,7 +149,7 @@ public:
 
   friend class SPMeshPatchI;
 
-  SPMeshNodeArray() { built = false; mg = nullptr; };
+  SPMeshNodeArray() { built = false; };
   SPMeshNodeArray( SPMeshGradient *mg );
   SPMeshNodeArray( const SPMeshNodeArray& rhs );
   SPMeshNodeArray& operator=(const SPMeshNodeArray& rhs);
@@ -160,7 +159,7 @@ public:
 
   void update_node_vectors();
 
-  bool read( SPMeshGradient *mg );
+  bool read( SPMeshGradient const *mg );
   void write( SPMeshGradient *mg );
   void create( SPMeshGradient *mg, SPItem *item, Geom::OptRect bbox );
   void clear();
@@ -181,7 +180,7 @@ public:
   unsigned side_arc     (std::vector<unsigned> const &);
   unsigned tensor_toggle(std::vector<unsigned> const &);
   unsigned color_smooth (std::vector<unsigned> const &);
-  unsigned color_pick   (std::vector<unsigned> const &, SPItem *);
+  unsigned color_pick   (std::vector<unsigned> const &, SPGradient *, SPItem *);
   unsigned insert       (std::vector<unsigned> const &);
 
   // Update other nodes in response to a node move.
@@ -196,7 +195,7 @@ public:
   void transform(Geom::Affine const &m);
 
   // Transform mesh to fill box. Return true if not identity transform.
-  bool fill_box(Geom::OptRect &box);
+  bool fill_box(SPMeshGradient *mg, Geom::OptRect &box);
 
   // Find bounding box
   // Geom::OptRect findBoundingBox();

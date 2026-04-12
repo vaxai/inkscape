@@ -16,11 +16,10 @@
 #include <cairo.h>
 #include <2geom/rect.h>
 #include <2geom/affine.h>
-#include "object/sp-gradient-spread.h"
-#include "object/sp-gradient-units.h"
-#include "object/sp-gradient-vector.h"
+#include "object/sp-paint-server-data.h"
 
 class SPGradient;
+class SPPaintServer;
 
 namespace Inkscape {
 namespace Colors {
@@ -96,13 +95,13 @@ class DrawingLinearGradient final
 {
 public:
     DrawingLinearGradient(SPGradientSpread spread, SPGradientUnits units, Geom::Affine const &transform,
-                          float x1, float y1, float x2, float y2, std::vector<SPGradientStop> stops)
+                          SPGradientVector const *vector)
         : DrawingGradient(spread, units, transform)
-        , x1(x1)
-        , y1(y1)
-        , x2(x2)
-        , y2(y2)
-        , stops(std::move(stops)) {}
+        , x1(vector->geom[0])
+        , y1(vector->geom[1])
+        , x2(vector->geom[2])
+        , y2(vector->geom[3])
+        , stops(vector->stops) {}
 
     cairo_pattern_t *create_pattern(cairo_t*, Geom::OptRect const &bbox, double opacity) const override;
 
@@ -119,22 +118,22 @@ class DrawingRadialGradient final
 {
 public:
     DrawingRadialGradient(SPGradientSpread spread, SPGradientUnits units, Geom::Affine const &transform,
-                          float fx, float fy, float cx, float cy, float r, float fr, std::vector<SPGradientStop> stops)
+                          SPGradientVector const *vector)
         : DrawingGradient(spread, units, transform)
-        , fx(fx)
-        , fy(fy)
-        , cx(cx)
-        , cy(cy)
-        , r(r)
-        , fr(fr)
-        , stops(std::move(stops)) {}
+        , cx(vector->geom[0])
+        , cy(vector->geom[1])
+        , r(vector->geom[2])
+        , fx(vector->geom[3])
+        , fy(vector->geom[4])
+        , fr(vector->geom[5])
+        , stops(vector->stops) {}
 
     cairo_pattern_t *create_pattern(cairo_t *ct, Geom::OptRect const &bbox, double opacity) const override;
 
     bool uses_cairo_ctx() const override { return true; }
 
 private:
-    float fx, fy, cx, cy, r, fr;
+    float cx, cy, r, fx, fy, fr;
     std::vector<SPGradientStop> stops;
 };
 
@@ -145,29 +144,22 @@ class DrawingMeshGradient final
     : public DrawingGradient
 {
 public:
-    struct PatchData
-    {
-        Geom::Point points[4][4];
-        char pathtype[4];
-        bool tensorIsSet[4];
-        Geom::Point tensorpoints[4];
-        std::optional<Colors::Color> color[4];
-    };
-
     DrawingMeshGradient(SPGradientSpread spread, SPGradientUnits units, Geom::Affine const &transform,
-                        int rows, int cols, std::vector<std::vector<PatchData>> patchdata)
+                        SPGradientMesh const *mesh)
         : DrawingGradient(spread, units, transform)
-        , rows(rows)
-        , cols(cols)
-        , patchdata(std::move(patchdata)) {}
+        , rows(mesh->rows)
+        , cols(mesh->cols)
+        , patchdata(mesh->patches) {}
 
     cairo_pattern_t *create_pattern(cairo_t*, Geom::OptRect const &bbox, double opacity) const override;
 
 private:
     int rows;
     int cols;
-    std::vector<std::vector<PatchData>> patchdata;
+    std::vector<std::vector<SPGradientPatch>> patchdata;
 };
+
+std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver(SPPaintServer *ps);
 
 } // namespace Inkscape
 

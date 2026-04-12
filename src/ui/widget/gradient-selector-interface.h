@@ -3,8 +3,7 @@
 #define SEEN_GRADIENT_SELECTOR_INTERFACE_H
 
 #include "object/sp-gradient.h"
-#include "object/sp-gradient-spread.h"
-#include "object/sp-gradient-units.h"
+#include "object/sp-paint-server-data.h"
 
 class GradientSelectorInterface {
 public:

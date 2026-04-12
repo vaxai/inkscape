@@ -32,7 +32,8 @@ public:
     SVGLength x2;
     SVGLength y2;
 
-    std::unique_ptr<Inkscape::DrawingPaintServer> create_drawing_paintserver() override;
+    PaintServerType getPaintType() const override { return PaintServerType::LINEAR_GRADIENT; }
+    std::vector<double> getGradientGeom() const override;
 
     Geom::Line getLine() const {
         return Geom::Line({x1.computed, y1.computed}, {x2.computed, y2.computed});
