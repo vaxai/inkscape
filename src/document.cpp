@@ -305,7 +305,7 @@ void SPDocument::prunePages(const std::string &page_nums, bool invert)
             ensureUpToDate();
             _page_manager->deletePage(page, true);
         }
-    }    
+    }
 }
 
 void SPDocument::queueForOrphanCollection(SPObject *object) {
@@ -709,7 +709,7 @@ void SPDocument::rebase(const gchar * file, bool keep_namedview)
     \param  new_xmldoc  The root node to inject into.
 
     This function first deletes all the root attributes in the old document followed
-    by copying all the root attributes from the new document to the old document.    
+    by copying all the root attributes from the new document to the old document.
 
     Then, it copies all the element in the new XML::Document into the root of document.
     keep a diferent approach for namedview to not erase it and merge new value
@@ -1611,9 +1611,13 @@ bool SPDocument::_updateDocument(int update_flags, unsigned int object_modified_
         auto nv = getNamedView();
         nv->fix_guidelines();
         nv->updateViewPort();
-        // repaint pages
+        // repaint namedview children (guides, grids, etc.)
         for (auto& child : nv->children) {
             child.requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
+        }
+        // repaint pages (which live in defs, not namedview)
+        for (auto page : getPageManager().getPages()) {
+            page->requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
         }
         // refresh display
         _y_axis_flipped.emit(shift);
