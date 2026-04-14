@@ -537,7 +537,7 @@ std::vector<std::vector<Glib::ustring>> raw_data_object =
     {"app.object-rotate-90-ccw",      N_("Object Rotate 90 CCW"),    SECTION, N_("Rotate selection 90° counter-clockwise")},
     {"app.object-flip-horizontal",    N_("Object Flip Horizontal"),  SECTION, N_("Flip selected objects horizontally")},
     {"app.object-flip-vertical",      N_("Object Flip Vertical"),    SECTION, N_("Flip selected objects vertically")},
-    {"app.object-star-turn-upright",  N_("Object Star Turn Upright"), SECTION, N_("Turn stars and polygons upright")}
+    {"app.object-star-turn-upright",  N_("Turn Stars/Polygons Upright"), SECTION, N_("Turn stars and polygons upright")}
     // clang-format on
 };
 
