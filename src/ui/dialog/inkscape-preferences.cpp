@@ -2955,6 +2955,15 @@ void InkscapePreferences::initPageRendering()
     _rendering_xray_radius.init("/options/rendering/xray-radius", 1.0, 1500.0, 1.0, 100.0, 100.0, true, false);
     _page_rendering.add_line( false, _("X-ray radius:"), _rendering_xray_radius, "", _("Radius of the circular area around the mouse cursor in X-ray mode"), false);
 
+    // outline display mode
+    _page_rendering.add_group_header(_("Outline display mode"));
+    _rendering_object_outline_color.init(_("Objects color:"), "/options/wireframecolors/default", "#000000ff");
+    _page_rendering.add_line(true, _("Objects color:"), _rendering_object_outline_color, "", _("Selects the color of the objects in Outline display mode"), false);
+    _rendering_clip_outline_color.init(_("Clips color:"), "/options/wireframecolors/clips", "#00ff00ff");
+    _page_rendering.add_line(true, _("Clips color:"), _rendering_clip_outline_color, "", _("Selects the color of the clips in Outline display mode"), false);
+    _rendering_mask_outline_color.init(_("Masks color:"), "/options/wireframecolors/masks", "#0000ffff");
+    _page_rendering.add_line(true, _("Masks color:"), _rendering_mask_outline_color, "", _("Selects the color of the masks in Outline display mode"), false);
+
     // rendering outline overlay opacity
     _rendering_outline_overlay_opacity.init("/options/rendering/outline-overlay-opacity", 0.0, 100.0, 1.0, 5.0, 50.0, true, false);
     _page_rendering.add_line( false, _("Outline overlay opacity:"), _rendering_outline_overlay_opacity, _("%"), _("Opacity of the overlay in outline overlay view mode"), false);
@@ -3197,7 +3206,9 @@ void InkscapePreferences::initPageBitmaps()
     _page_bitmaps.add_group_header( _("Render"));
     // rendering outlines for pixmap image tags
     _rendering_image_outline.init( _("Images in Outline Mode"), "/options/rendering/imageinoutlinemode", false);
-    _page_bitmaps.add_line(false, "", _rendering_image_outline, "", _("When active will render images while in outline mode instead of a red box with an x. This is useful for manual tracing."));
+    _page_bitmaps.add_line(true, "", _rendering_image_outline, "", _("When active will render images while in outline mode instead of a red box with an x. This is useful for manual tracing."));
+    _rendering_image_outline_color.init(_("Outline mode wireframe color:"), "/options/wireframecolors/images", "#ff0000ff");
+    _page_bitmaps.add_line(true, _("Outline mode wireframe color:"), _rendering_image_outline_color, "", _("Selects the color of the image wireframe in Outline display mode"), false);
 
     this->AddPage(_page_bitmaps, _("Imported Images"), PREFS_PAGE_BITMAPS);
 }

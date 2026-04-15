@@ -942,7 +942,7 @@ unsigned DrawingItem::render(DrawingContext &dc, RenderContext &rc, Geom::IntRec
 unsigned DrawingItem::render(DrawingContext &dc, Geom::IntRect const &area, unsigned flags) const
 {
     auto rc = RenderContext{
-        .outline_color = Colors::Color(0xff),
+        .outline_color = _drawing.outlineColor(),
         .antialiasing_override = _drawing._antialiasing_override,
         .dithering = _drawing._use_dithering
     };

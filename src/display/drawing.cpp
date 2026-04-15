@@ -52,6 +52,7 @@ static auto default_numthreads()
 Drawing::Drawing(Inkscape::CanvasItemDrawing *canvas_item_drawing)
     : _canvas_item_drawing(canvas_item_drawing)
     , _grayscale_matrix(std::vector<double>(grayscale_matrix.begin(), grayscale_matrix.end()))
+    , _outline_color{0xFF}
     , _clip_outline_color{0xFF}
     , _mask_outline_color{0xFF}
     , _image_outline_color{0xFF}
@@ -112,6 +113,16 @@ void Drawing::setGrayscaleMatrix(double value_matrix[20])
     defer([=, this] {
         _grayscale_matrix = Filters::FilterColorMatrix::ColorMatrixMatrix(std::vector<double>(value_matrix, value_matrix + 20));
         if (_rendermode != RenderMode::OUTLINE) {
+            _root->_markForRendering();
+        }
+    });
+}
+
+void Drawing::setOutlineColor(Colors::Color col)
+{
+    defer([=, this] {
+        _outline_color = std::move(col);
+        if (_rendermode == RenderMode::OUTLINE || _outlineoverlay) {
             _root->_markForRendering();
         }
     });
@@ -243,11 +254,9 @@ void Drawing::render(DrawingContext &dc, Geom::IntRect const &area, unsigned fla
 {
     apply_antialias(dc, _antialiasing_override.value_or(Antialiasing(_root->_antialias)));
 
-    auto rc = RenderContext{
-        .outline_color = Colors::Color(0xff),
-        .antialiasing_override = _antialiasing_override,
-        .dithering = _use_dithering
-    };
+    auto rc = RenderContext{.outline_color = _outline_color,
+                            .antialiasing_override = _antialiasing_override,
+                            .dithering = _use_dithering};
     flags |= rendermode_to_renderflags(_rendermode);
 
     if (_clip) {
@@ -322,6 +331,7 @@ void Drawing::_loadPrefs()
     auto prefs = Inkscape::Preferences::get();
 
     // Set the initial values of preferences.
+    _outline_color       = prefs->getColor     ("/options/wireframecolors/default",      "#000000"); // Black object outlines by default.
     _clip_outline_color  = prefs->getColor     ("/options/wireframecolors/clips",        "#00ff00"); // Green clip outlines by default.
     _mask_outline_color  = prefs->getColor     ("/options/wireframecolors/masks",        "#0000ff"); // Blue mask outlines by default.
     _image_outline_color = prefs->getColor     ("/options/wireframecolors/images",       "#ff0000"); // Red image outlines by default.
@@ -349,6 +359,7 @@ void Drawing::_loadPrefs()
         std::unordered_map<std::string, std::function<void (Preferences::Entry const &)>> actions;
 
         // Todo: (C++20) Eliminate this repetition by baking the preference metadata into the variables themselves using structural templates.
+        actions.emplace("/options/wireframecolors/default",      [this] (auto &entry) { setOutlineColor(entry.getColor("#000000")); });
         actions.emplace("/options/wireframecolors/clips",        [this] (auto &entry) { setClipOutlineColor (entry.getColor("#00ff00")); });
         actions.emplace("/options/wireframecolors/masks",        [this] (auto &entry) { setMaskOutlineColor (entry.getColor("#0000ff")); });
         actions.emplace("/options/wireframecolors/images",       [this] (auto &entry) { setImageOutlineColor(entry.getColor("#ff0000")); });

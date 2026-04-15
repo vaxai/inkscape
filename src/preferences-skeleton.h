@@ -331,11 +331,12 @@ static char const preferences_skeleton[] =
     <group id="outlinemode" value="0"/>
 
     <group id="wireframecolors"
-           onlight="255"
-           ondark="4294967295"
-           images="4278190335"
-           clips="16711935"
-           masks="65535"/>
+           default="#000000ff"
+           onlight="#000000ff"
+           ondark="#ffffffff"
+           images="#ff0000ff"
+           clips="#00ff00ff"
+           masks="#0000ffff"/>
     <group id="svgoutput"
            disable_optimizations="0"
            usenamedcolors="0"
