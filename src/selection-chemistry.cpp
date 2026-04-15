@@ -24,20 +24,21 @@
 
 #include "selection-chemistry.h"
 
-#include <2geom/numeric/symmetric-matrix-fs-operation.h>
 #include <cstring>
-#include <glibmm/i18n.h>
+#include <deque>
 #include <map>
 #include <ranges>
 #include <string>
+#include <glibmm/i18n.h>
+#include <2geom/numeric/symmetric-matrix-fs-operation.h>
 
-#include "display/control/canvas-item-drawing.h"
 #include "actions/actions-tools.h" // Switching tools
 #include "context-fns.h"
 #include "desktop-style.h"
 #include "desktop.h"
 #include "display/cairo-utils.h"
 #include "display/control/canvas-item-bpath.h"
+#include "display/control/canvas-item-drawing.h"
 #include "display/curve.h"
 #include "display/drawing.h"
 #include "document-undo.h"
@@ -49,7 +50,6 @@
 #include "live_effects/effect.h"
 #include "live_effects/lpeobject.h"
 #include "message-stack.h"
-#include "page-manager.h"
 #include "object/box3d.h"
 #include "object/object-set.h"
 #include "object/persp3d.h"
@@ -81,6 +81,7 @@
 #include "object/sp-tref.h"
 #include "object/sp-tspan.h"
 #include "object/sp-use.h"
+#include "page-manager.h"
 #include "path-chemistry.h"
 #include "selection.h"
 #include "style.h"
@@ -1637,37 +1638,12 @@ void ObjectSet::applyAffine(Geom::Affine const &affine, bool set_i2d, bool compe
 
     _last_affine = affine;
 
-    // For each perspective with a box in selection, check whether all boxes are selected and
-    // unlink all non-selected boxes.
-    Persp3D *persp;
-    Persp3D *transf_persp;
-    std::list<Persp3D *> plist = perspList();
-    for (auto & i : plist) {
-        persp = (Persp3D *) i;
-
-        if (persp) {
-            if (!persp->has_all_boxes_in_selection (this)) {
-                // create a new perspective as a copy of the current one
-                transf_persp = Persp3D::create_copy(*persp);
-
-                std::list<SPBox3D *> selboxes = box3DList(persp);
-
-                for (auto & selboxe : selboxes) {
-                    selboxe->switch_perspectives(persp, transf_persp);
-                }
-            } else {
-                transf_persp = persp;
-            }
-
-            transf_persp->apply_affine_transformation(affine);
-        }
-    }
     auto items_copy = items();
-    std::vector<SPItem *> ordered_items;
+    std::deque<SPItem *> ordered_items;
     for (auto item : items_copy) {
         auto clonelpe = cast<SPLPEItem>(item);
         if (clonelpe && clonelpe->hasPathEffectOfType(Inkscape::LivePathEffect::CLONE_ORIGINAL)) {
-            ordered_items.insert(ordered_items.begin(), item);
+            ordered_items.push_front(item);
         } else {
             ordered_items.push_back(item);
         }
@@ -1806,7 +1782,7 @@ void ObjectSet::applyAffine(Geom::Affine const &affine, bool set_i2d, bool compe
             if (set_i2d) {
                 item->set_i2d_affine(item->i2dt_affine() * (Geom::Affine)affine);
             }
-            item->doWriteTransform(item->transform, &item->transform, compensate);
+            item->doWriteTransform(item->transform, nullptr, compensate);
         }
 
         if (adjust_transf_center) { // The transformation center should not be touched in case of pasting or importing, which is allowed by this if clause
@@ -1816,6 +1792,22 @@ void ObjectSet::applyAffine(Geom::Affine const &affine, bool set_i2d, bool compe
                 item->setCenter(old_center * affine);
                 item->updateRepr();
             }
+        }
+    }
+
+    // For each perspective with a box in selection, check whether all boxes are selected and
+    // unlink all non-selected boxes.
+    for (auto *persp : perspList()) {
+        if (persp) {
+            if (!persp->has_all_boxes_in_selection(this)) {
+                // create a new perspective as a copy of the current one
+                Persp3D *transf_persp = Persp3D::create_copy(*persp);
+                for (auto *selboxe : box3DList(persp)) {
+                    selboxe->switch_perspectives(persp, transf_persp);
+                }
+                persp = transf_persp;
+            }
+            persp->apply_affine_transformation(affine);
         }
     }
 }
