@@ -227,6 +227,7 @@ Pixbuf *Pixbuf::create_from_data_uri(gchar const *uri_data, double svgdpi)
         auto svgDoc = SPDocument::createNewDocFromMem({reinterpret_cast<char const *>(decoded), decoded_len});
         // Check the document loaded properly
         if (!svgDoc || !svgDoc->getRoot()) {
+            g_free(decoded);
             return nullptr;
         }
         Inkscape::Preferences *prefs = Inkscape::Preferences::get();
@@ -238,17 +239,24 @@ Pixbuf *Pixbuf::create_from_data_uri(gchar const *uri_data, double svgdpi)
         // Get the size of the document
         Inkscape::Util::Quantity svgWidth = svgDoc->getWidth();
         Inkscape::Util::Quantity svgHeight = svgDoc->getHeight();
-        const double svgWidth_px = svgWidth.value("px");
-        const double svgHeight_px = svgHeight.value("px");
+        // Limit the size of the document to 100 inches square, mirroring create_from_buffer
+        double const svgWidth_px = std::min(svgWidth.value("px"), dpi * 100);
+        double const svgHeight_px = std::min(svgHeight.value("px"), dpi * 100);
         if (svgWidth_px < 0 || svgHeight_px < 0) {
             g_warning("create_from_data_uri: malformed document: svgWidth_px=%f, svgHeight_px=%f", svgWidth_px,
                       svgHeight_px);
+            g_free(decoded);
             return nullptr;
         }
-        
+
         assert(!pixbuf);
         Geom::Rect area(0, 0, svgWidth_px, svgHeight_px);
         pixbuf = sp_generate_internal_bitmap(svgDoc.get(), area, dpi);
+        if (!pixbuf) {
+            std::cerr << "Pixbuf::create_from_data_uri: failed to rasterize embedded SVG" << std::endl;
+            g_free(decoded);
+            return nullptr;
+        }
         GdkPixbuf const *buf = pixbuf->getPixbufRaw();
 
         // Tidy up

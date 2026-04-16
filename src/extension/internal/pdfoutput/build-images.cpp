@@ -153,6 +153,8 @@ void DrawContext::paint_raster(SPImage const *image)
     } else {
         g_warning("No image loaded for image tag.");
     }
+
+    g_free(const_cast<char *>(decoded));
 }
 
 /**

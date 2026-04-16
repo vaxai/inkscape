@@ -302,6 +302,10 @@ std::unique_ptr<SPDocument> ink_markers_preview_doc(const Glib::ustring& group_i
 )A"sv;
 
     auto document = SPDocument::createNewDocFromMem(buffer);
+    if (!document) {
+        g_warning("ink_markers_preview_doc: failed to create preview document");
+        return nullptr;
+    }
     // only leave a requested group, so nothing else gets rendered
     for (auto&& group : document->getObjectsByClass("group")) {
         assert(group->getId());
@@ -612,12 +616,20 @@ Cairo::RefPtr<Cairo::Surface> object_renderer::render(SPObject& object, double w
         if (!_symbol_document) {
             _symbol_document = symbols_preview_doc();
         }
+        if (!_symbol_document) {
+            g_warning("render_object: failed to create symbol preview document");
+            return surface;
+        }
         surface = draw_symbol(object, width, height, device_scale, _symbol_document.get(), opt._symbol_style_from_use);
     }
     else if (is<SPMarker>(&object)) {
         const auto group = "marker-mid";
         if (!_sandbox) {
             _sandbox = ink_markers_preview_doc(group);
+        }
+        if (!_sandbox) {
+            g_warning("render_object: failed to create marker preview document");
+            return surface;
         }
         std::optional<guint32> checkerboard; // rgb background color
         bool add_cross = false;
