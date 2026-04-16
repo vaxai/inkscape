@@ -97,7 +97,11 @@ Linked&lt;/small&gt;</property>
           <object class="GtkBox">
             <property name="halign">center</property>
             <property name="spacing">4</property>
-            <property name="icon-name">shape-image</property>
+            <child>
+              <object class="GtkImage">
+                <property name="icon-name">shape-image</property>
+              </object>
+            </child>
             <child>
               <object class="GtkLabel">
                 <property name="label" translatable="yes">Embed</property>
@@ -125,7 +129,11 @@ Linked&lt;/small&gt;</property>
           <object class="GtkBox">
             <property name="halign">center</property>
             <property name="spacing">4</property>
-            <property name="icon-name">document-export</property>
+            <child>
+              <object class="GtkImage">
+                <property name="icon-name">document-export</property>
+              </object>
+            </child>
             <child>
               <object class="GtkLabel">
                 <property name="label" translatable="yes">Save copy...</property>
