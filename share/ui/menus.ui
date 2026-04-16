@@ -830,6 +830,10 @@
               <attribute name="label" translatable="yes">_Release Clip</attribute>
               <attribute name="action">app.object-release-clip</attribute>
             </item>
+            <item>
+              <attribute name="label" translatable="yes">Set Clip G_roup</attribute>
+              <attribute name="action">app.object-set-clip-group</attribute>
+            </item>
           </section>
         </submenu>
       </section>
