@@ -123,7 +123,7 @@ private:
     std::optional<Antialiasing> _antialiasing_override;
 
     std::set<DrawingItem*> _cached_items; // modified by DrawingItem::_setCached()
-    CacheList _candidate_items;           // keep this list always sorted with std::greater
+    CacheSet _candidate_items;           // keep this list always sorted with std::greater
 
     /*
      * Simple cacheline separator compatible with x86 (64 bytes) and M* (128 bytes).

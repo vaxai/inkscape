@@ -289,7 +289,7 @@ void Drawing::_pickItemsForCaching()
         to_cache.emplace_back(rec.item);
         used += rec.cache_size;
     }
-    std::sort(to_cache.begin(), to_cache.end());
+    std::reverse(to_cache.begin(), to_cache.end());
 
     // Uncache the items that are cached but should not be cached.
     // Note: setCached() modifies _cached_items, so the temporary container is necessary.

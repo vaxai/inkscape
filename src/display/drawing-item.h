@@ -15,15 +15,16 @@
 
 #include <cstdint>
 #include <exception>
-#include <memory>
 #include <list>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
-#include <boost/operators.hpp>
 #include <boost/intrusive/list.hpp>
-#include <2geom/rect.h>
+#include <boost/intrusive/set.hpp>
+#include <boost/operators.hpp>
 #include <2geom/affine.h>
+#include <2geom/rect.h>
 
 #include "colors/color.h"
 #include "style-enums.h"
@@ -71,8 +72,13 @@ struct CacheRecord : boost::totally_ordered<CacheRecord>
     double score;
     size_t cache_size;
     DrawingItem *item;
+
+    using SetHook = boost::intrusive::set_member_hook<>;
+    SetHook _cache_hook;
 };
-using CacheList = std::list<CacheRecord>;
+using CacheSet = boost::intrusive::multiset<
+    CacheRecord, boost::intrusive::member_hook<CacheRecord, CacheRecord::SetHook, &CacheRecord::_cache_hook>,
+    boost::intrusive::compare<std::greater<CacheRecord>>>;
 
 struct InvalidItemException : std::exception
 {
@@ -221,8 +227,8 @@ protected:
     Geom::OptIntRect _bbox; ///< Bounding box in display (pixel) coords including stroke
     Geom::OptIntRect _drawbox; ///< Full visual bounding box - enlarged by filters, shrunk by clips and masks
     Geom::OptRect _item_bbox; ///< Geometric bounding box in item's user space.
-                              ///  This is used to compute the filter effect region and render in
-                              ///  objectBoundingBox units.
+                               ///  This is used to compute the filter effect region and render in
+                               ///  objectBoundingBox units.
 
     DrawingItem *_clip;
     DrawingItem *_mask;
@@ -233,7 +239,8 @@ protected:
     int _update_complexity = 0;
     bool _contains_unisolated_blend : 1;
 
-    CacheList::iterator _cache_iterator;
+    CacheSet::iterator _cache_iterator;
+    CacheRecord _cache_record;
 
     bool style_vector_effect_size   : 1;
     bool style_vector_effect_rotate : 1;
@@ -243,14 +250,14 @@ protected:
     unsigned _propagate_state : 8;
     ChildType _child_type : 3;
     unsigned _background_new : 1; ///< Whether enable-background: new is set for this element
-    unsigned _background_accumulate : 1; ///< Whether this element accumulates background 
+    unsigned _background_accumulate : 1; ///< Whether this element accumulates background
                                          ///  (has any ancestor with enable-background: new)
     unsigned _visible : 1;
     unsigned _sensitive : 1; ///< Whether this item responds to events
     unsigned _cached_persistent : 1; ///< If set, will always be cached regardless of score
     unsigned _has_cache_iterator : 1; ///< If set, _cache_iterator is valid
     unsigned _pick_children : 1; ///< For groups: if true, children are returned from pick(),
-                                 ///  otherwise the group is returned
+                                      ///  otherwise the group is returned
     Antialiasing _antialias : 2; ///< antialiasing level (default is Good)
 
     bool _isolation : 1;

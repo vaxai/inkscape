@@ -628,14 +628,12 @@ void DrawingItem::update(Geom::IntRect const &area, UpdateContext const &ctx, un
         // Determine whether to make this item eligible for caching, by creating a cache iterator.
         double score = _cacheScore();
         if (score >= CACHE_SCORE_THRESHOLD && cacheable) {
-            CacheRecord cr;
-            cr.score = score;
+            _cache_record.score = score;
             // if _cacheRect() is empty, a negative score will be returned from _cacheScore(),
             // so this will not execute (cache score threshold must be positive)
-            cr.cache_size = _cacheRect()->area() * 4;
-            cr.item = this;
-            auto it = std::lower_bound(_drawing._candidate_items.begin(), _drawing._candidate_items.end(), cr, std::greater<CacheRecord>());
-            _cache_iterator = _drawing._candidate_items.insert(it, cr);
+            _cache_record.cache_size = _cacheRect()->area() * 4;
+            _cache_record.item = this;
+            _cache_iterator = _drawing._candidate_items.insert(_cache_record);
             _has_cache_iterator = true;
         }
 
