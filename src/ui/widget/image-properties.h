@@ -42,6 +42,7 @@ public:
 private:
     void css_changed(GtkCssStyleChange *change) final;
     void update_bg_color();
+    void reset_preview();
 
     Glib::RefPtr<Gtk::Builder> _builder;
 

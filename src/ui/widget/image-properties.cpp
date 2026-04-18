@@ -54,8 +54,11 @@ Cairo::RefPtr<Cairo::Surface> draw_preview(SPImage* image, double width, double 
     return r.render(*image, width, height, device_scale, opt);
 }
 
-void link_image(Gtk::Window* window, SPImage* image) {
-    if (!window || !image) return;
+bool link_image(Gtk::Window *window, SPImage *image)
+{
+    if (!window || !image) {
+        return false;
+    }
 
     static std::string current_folder;
     std::vector<Glib::ustring> mime_types = {
@@ -63,7 +66,9 @@ void link_image(Gtk::Window* window, SPImage* image) {
         "image/svg+xml"
     };
     auto file = choose_file_open(_("Change Image"), window, mime_types, current_folder);
-    if (!file) return;
+    if (!file) {
+        return false;
+    }
 
     auto uri = file->get_uri();
     setHrefAttribute(*image->getRepr(), uri);
@@ -72,6 +77,7 @@ void link_image(Gtk::Window* window, SPImage* image) {
     // TODO: this needs to be fixed in SPImage
     image->document->_updateDocument(0);
     DocumentUndo::done(image->document, RC_("Undo", "Change image"), INKSCAPE_ICON("shape-image"));
+    return true;
 }
 
 void set_rendering_mode(SPImage* image, int index) {
@@ -127,7 +133,9 @@ ImageProperties::ImageProperties() :
     change.signal_clicked().connect([this]{
         if (_update.pending()) return;
         auto window = dynamic_cast<Gtk::Window*>(_preview.get_root());
-        link_image(window, _image);
+        if (link_image(window, _image)) {
+            reset_preview();
+        }
     });
 
     auto& extract = get_widget<Gtk::Button>(_builder, "export");
@@ -175,6 +183,10 @@ ImageProperties::~ImageProperties() = default;
 
 void ImageProperties::update(SPImage* image) {
     if (!image && !_image) return; // nothing to do
+
+    if (_image != image) {
+        reset_preview();
+    }
 
     _image = image;
 
@@ -256,30 +268,33 @@ void ImageProperties::update(SPImage* image) {
 
     }
 
-    int width = _preview_max_width;
-    int height = _preview_max_height;
-    if (image && image->pixbuf) {
-        double sw = image->pixbuf->width();
-        double sh = image->pixbuf->height();
-        double sx = sw / width;
-        double sy = sh / height;
-        auto scale = 1.0 / std::max(sx, sy);
-        width = std::max(1, int(sw * scale + 0.5));
-        height = std::max(1, int(sh * scale + 0.5));
-    }
-    // expand size to account for a frame around the image
-    int frame = 2;
-    width += frame;
-    height += frame;
-    _preview.set_size_request(width, height);
-    _preview.queue_draw();
+    if (!_preview_image) {
+        int width = _preview_max_width;
+        int height = _preview_max_height;
+        if (image && image->pixbuf) {
+            double sw = image->pixbuf->width();
+            double sh = image->pixbuf->height();
+            double sx = sw / width;
+            double sy = sh / height;
+            auto scale = 1.0 / std::max(sx, sy);
+            width = std::max(1, int(sw * scale + 0.5));
+            height = std::max(1, int(sh * scale + 0.5));
+        }
+        // expand size to account for a frame around the image
+        int frame = 2;
+        width += frame;
+        height += frame;
 
-    // prepare preview
-    auto device_scale = _preview.get_scale_factor();
-    auto const fg = _preview.get_color();
-    auto foreground = conv_gdk_color_to_rgba(fg, 0.30);
-    update_bg_color();
-    _preview_image = draw_preview(_image, width, height, device_scale, foreground, _background_color);
+        _preview.set_size_request(width, height);
+        _preview.queue_draw();
+
+        // prepare preview
+        auto device_scale = _preview.get_scale_factor();
+        auto const fg = _preview.get_color();
+        auto foreground = conv_gdk_color_to_rgba(fg, 0.30);
+        update_bg_color();
+        _preview_image = draw_preview(_image, width, height, device_scale, foreground, _background_color);
+    }
 }
 
 void ImageProperties::update_bg_color() {
@@ -292,9 +307,15 @@ void ImageProperties::update_bg_color() {
     }
 }
 
+void ImageProperties::reset_preview()
+{
+    _preview_image.reset();
+}
+
 void ImageProperties::css_changed(GtkCssStyleChange * /*change*/)
 {
     update_bg_color();
+    reset_preview();
     update(_image);
 }
 
