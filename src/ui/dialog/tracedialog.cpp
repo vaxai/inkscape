@@ -186,6 +186,12 @@ TraceData TraceDialogImpl::getTraceData() const
                 eng->setPreserveWidth(true);
                 break;
             case Inkscape::Trace::Potrace::TraceType::AUTOTRACE_MULTI:
+                // Setting color count to 1 produces nothing, setting it to 2 gives a single scan.
+                // It seems that the number of scans being done is 1 fewer than the color count we
+                // set. Thus, incrementing the value by 1 gives the desired number of scans.
+                // According to autotrace documentation, the domain of the color-count variable is
+                // [1, 256]. Since, we add an extra 1 to get rid of the fewer scans problem, we must
+                // limit the UI input values to [1, 255] to not override the original domain.
                 eng->setColorCount((int)MS_scans->get_value() + 1);
                 break;
             default:
