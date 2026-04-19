@@ -593,7 +593,7 @@ void ObjectSet::duplicate(bool suppressDone, bool duplicateLayer)
             old_obj->unsetTmpSuccessor();
         }
     }
-    
+
     if (!duplicateLayer) {
         setReprList(newsel);
         if ( !suppressDone ) {
@@ -4018,7 +4018,7 @@ void ObjectSet::swapFillStroke()
             sp_repr_css_set_property (css, "stroke", "none");
         else if (paint->set && paint->isColor()) {
             auto color = paint->getColor();
-            color.addOpacity(item->style->fill_opacity);
+            color.addOpacity(item->style->fill_opacity.as_double());
             sp_repr_css_set_property_string(css, "stroke", color.toString());
         }
         else if (!paint->set)
@@ -4040,7 +4040,7 @@ void ObjectSet::swapFillStroke()
             sp_repr_css_set_property (css, "fill", "none");
         else if (paint->set && paint->isColor()) {
             auto color = paint->getColor();
-            color.addOpacity(item->style->stroke_opacity);
+            color.addOpacity(item->style->stroke_opacity.as_double());
             sp_repr_css_set_property_string(css, "fill", color.toString());
         }
         else if (!paint->set)

@@ -104,7 +104,7 @@ StyleSwatch::StyleSwatch(SPCSSAttr *css, gchar const *main_tip, Gtk::Orientation
 
     UI::pack_start(_stroke, _place[SS_STROKE]);
     UI::pack_start(_stroke, _stroke_width, UI::PackOptions::shrink);
-    
+
     if (orient == Gtk::Orientation::VERTICAL) {
         _table->attach(_label[SS_FILL],   0, 0, 1, 1);
         _table->attach(_label[SS_STROKE], 0, 1, 1, 1);
@@ -165,7 +165,7 @@ StyleSwatch::setWatchedTool(const char *path, bool synthesize)
     } else {
         _tool_path = "";
     }
-    
+
     if (synthesize && _tool_obs) {
         _tool_obs->call();
     }
@@ -228,7 +228,7 @@ void StyleSwatch::setStyle(SPStyle *query)
             }
         } else if (paint->set && paint->isColor()) {
             auto color = paint->getColor();
-            color.addOpacity(i == SS_FILL ? query->fill_opacity : query->stroke_opacity);
+            color.addOpacity(i == SS_FILL ? query->fill_opacity.as_double() : query->stroke_opacity.as_double());
             _color_preview[i]->setRgba32(color.toRGBA());
             place->append(*_color_preview[i]);
             gchar *tip;
@@ -290,7 +290,7 @@ void StyleSwatch::setStyle(SPStyle *query)
         _stroke_width.set_markup("");
     }
 
-    gdouble op = SP_SCALE24_TO_FLOAT(query->opacity.value);
+    double op = query->opacity.as_double();
     if (op != 1) {
         {
             gchar *str;

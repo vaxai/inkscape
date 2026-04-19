@@ -167,7 +167,7 @@ unsigned int PrintLatex::fill(Inkscape::Extension::Print * /*mod*/,
 
         os.setf(std::ios::fixed);
 
-        fill_opacity=SP_SCALE24_TO_FLOAT(style->fill_opacity.value);
+        fill_opacity = style->fill_opacity.as_double();
         auto rgb = *style->fill.getColor().converted(Colors::Space::Type::RGB);
         os << "{\n\\newrgbcolor{curcolor}{" << rgb[0] << " " << rgb[1] << " " << rgb[2] << "}\n";
         os << "\\pscustom[linestyle=none,fillstyle=solid,fillcolor=curcolor";
@@ -201,7 +201,7 @@ unsigned int PrintLatex::stroke(Inkscape::Extension::Print * /*mod*/,
         double const scale = tr_stack.descrim();
         os.setf(std::ios::fixed);
 
-        double stroke_opacity = style->stroke_opacity;
+        double stroke_opacity = style->stroke_opacity.as_double();
         auto rgb = *style->stroke.getColor().converted(Colors::Space::Type::RGB);
         os << "{\n\\newrgbcolor{curcolor}{" << rgb[0] << " " << rgb[1] << " " << rgb[2] << "}\n";
 

@@ -221,7 +221,7 @@ void CairoRenderContext::setStateForStyle(SPStyle const *style)
 {
     // only opacity & overflow is stored for now
     auto &state = _state_stack.back();
-    state.opacity = SP_SCALE24_TO_FLOAT(style->opacity.value);
+    state.opacity = style->opacity.as_double();
     state.has_overflow = (style->overflow.set && style->overflow.value != SP_CSS_OVERFLOW_VISIBLE);
     state.has_filtereffect = style->filter.set;
 
@@ -1333,7 +1333,7 @@ void CairoRenderContext::_setFillStyle(SPStyle const *const style, Geom::OptRect
                       || style->fill.isContext()
                       || style->fill.isPaintserver() );
 
-    float const alpha = _mergedOpacity(SP_SCALE24_TO_FLOAT(style->fill_opacity.value));
+    float const alpha = _mergedOpacity(style->fill_opacity.as_double());
     SPPaintServer const *paint_server = style->getFillPaintServer();
     if (style->fill.isContext()) {
         // Do nothing. These are valid values but if not inside a <use> or <marker> element do nothing.
@@ -1359,7 +1359,7 @@ void CairoRenderContext::_setFillStyle(SPStyle const *const style, Geom::OptRect
 
 void CairoRenderContext::_setStrokeStyle(SPStyle const *style, Geom::OptRect const &pbox)
 {
-    float const alpha = _mergedOpacity(SP_SCALE24_TO_FLOAT(style->stroke_opacity.value));
+    float const alpha = _mergedOpacity(style->stroke_opacity.as_double());
     if (style->stroke.isContext()) {
         // Do nothing. These are valid values but if not inside a <use> or <marker> element do nothing.
     } else if (style->stroke.isColor() || (style->stroke.isPaintserver() && !style->getStrokePaintServer()->isValid())) {

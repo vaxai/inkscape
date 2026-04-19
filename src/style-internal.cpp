@@ -273,7 +273,7 @@ SPIScale24::read( gchar const *str ) {
             set = true;
             inherit = false;
             value_in = CLAMP(value_in, 0.0, 1.0);
-            value = SP_SCALE24_FROM_FLOAT( value_in );
+            set_double(value_in);
         }
     }
 }
@@ -281,7 +281,8 @@ SPIScale24::read( gchar const *str ) {
 const Glib::ustring SPIScale24::get_value() const
 {
     if (this->inherit) return Glib::ustring("inherit");
-    return Inkscape::ustring::format_classic(SP_SCALE24_TO_FLOAT(this->value));
+
+    return Inkscape::ustring::format_classic(as_double());
 }
 
 void

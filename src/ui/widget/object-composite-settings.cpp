@@ -113,7 +113,7 @@ ObjectCompositeSettings::_blendBlurValueChanged()
             SPFilter *filter = modify_filter_gaussian_blur_from_item(document, item, radius);
             filter->update_filter_region(item);
             sp_style_set_property_url(item, "filter", filter, false);
-        } 
+        }
         if (change_blend) {
             ; // update done already
         } else {
@@ -210,7 +210,7 @@ ObjectCompositeSettings::_subjectChanged() {
         case QUERY_STYLE_SINGLE:
         case QUERY_STYLE_MULTIPLE_AVERAGED: // TODO: treat this slightly differently
         case QUERY_STYLE_MULTIPLE_SAME:
-            _filter_modifier.set_opacity_value(query.opacity);
+            _filter_modifier.set_opacity_value(query.opacity.as_double());
             break;
     }
 

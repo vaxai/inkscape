@@ -758,7 +758,7 @@ SelectedStyle::update()
             dropEnabled[i] = true;
 
             auto paint = i == SS_FILL ? query.fill.upcast() : query.stroke.upcast();
-            double opacity = i == SS_FILL ? query.fill_opacity : query.stroke_opacity;
+            double opacity = i == SS_FILL ? query.fill_opacity.as_double() : query.stroke_opacity.as_double();
             if (paint->set && paint->isPaintserver()) {
                 SPPaintServer *server = (i == SS_FILL)? SP_STYLE_FILL_SERVER (&query) : SP_STYLE_STROKE_SERVER (&query);
                 if ( server ) {
@@ -883,7 +883,7 @@ SelectedStyle::update()
 
         _opacity_blocked = true;
         opacity_sb->set_sensitive(true);
-        opacity_adjustment->set_value(SP_SCALE24_TO_FLOAT(query.opacity.value) * 100);
+        opacity_adjustment->set_value(query.opacity.as_double() * 100);
         _opacity_blocked = false;
         break;
     }

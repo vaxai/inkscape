@@ -356,7 +356,7 @@ int PrintEmf::create_brush(SPStyle const *style, PU_COLORREF fcolor)
             fill_mode = DRAW_PAINT;
 #if 0
 // opacity not supported by EMF
-            float opacity = SP_SCALE24_TO_FLOAT(style->fill_opacity.value);
+            float opacity = style->fill_opacity.as_double();
             if (opacity <= 0.0) {
                 opacity = 0.0;    // basically the same as no fill
             }

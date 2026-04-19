@@ -815,7 +815,7 @@ void SPItem::update(SPCtx *ctx, unsigned flags)
 
         if (flags & SP_OBJECT_STYLE_MODIFIED_FLAG) {
             for (auto &v : views) {
-                v.drawingitem->setOpacity(SP_SCALE24_TO_FLOAT(style->opacity.value));
+                v.drawingitem->setOpacity(style->opacity.as_double());
                 v.drawingitem->setAntialiasing(style->shape_rendering.computed == SP_CSS_SHAPE_RENDERING_CRISPEDGES ? Inkscape::Antialiasing::None : Inkscape::Antialiasing::Good);
                 v.drawingitem->setIsolation(style->isolation.value);
                 v.drawingitem->setBlendMode(style->mix_blend_mode.value);
@@ -1167,7 +1167,7 @@ void SPItem::invoke_print(SPPrintContext *ctx)
 {
     if (!isHidden()) {
         if (!transform.isIdentity() || style->opacity.value != SP_SCALE24_MAX) {
-            ctx->bind(transform, SP_SCALE24_TO_FLOAT(style->opacity.value));
+            ctx->bind(transform, style->opacity.as_double());
             print(ctx);
             ctx->release();
         } else {
@@ -1286,7 +1286,7 @@ Inkscape::DrawingItem *SPItem::invoke_show(Inkscape::Drawing &drawing, unsigned 
     ai->setItem(this);
     ai->setItemBounds(bbox);
     ai->setTransform(transform);
-    ai->setOpacity(SP_SCALE24_TO_FLOAT(style->opacity.value));
+    ai->setOpacity(style->opacity.as_double());
     ai->setIsolation(style->isolation.value);
     ai->setBlendMode(style->mix_blend_mode.value);
     ai->setVisible(!isHidden());

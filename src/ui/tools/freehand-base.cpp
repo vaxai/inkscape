@@ -161,7 +161,7 @@ void spdc_apply_style(SPObject *obj)
             }
         } else if (obj->style->stroke.isColor()) {
             auto color = obj->style->stroke.getColor();
-            color.addOpacity(obj->style->stroke_opacity);
+            color.addOpacity(obj->style->stroke_opacity.as_double());
             sp_repr_css_set_property_string(css, "fill", color.toString());
         } else {
             sp_repr_css_set_property(css, "fill", "none");
@@ -305,8 +305,8 @@ static void spdc_check_for_and_apply_waiting_LPE(FreehandBase *dc, SPItem *item,
             }
         }
         Inkscape::UI::ClipboardManager *cm = Inkscape::UI::ClipboardManager::get();
-        if (is_bend && 
-           (shape == BEND_CLIPBOARD || (shape == LAST_APPLIED && previous_shape_type != CLIPBOARD)) && 
+        if (is_bend &&
+           (shape == BEND_CLIPBOARD || (shape == LAST_APPLIED && previous_shape_type != CLIPBOARD)) &&
             cm->paste(desktop, true))
         {
             bend_item = dc->selection->singleItem();
@@ -644,9 +644,9 @@ void spdc_concat_colors_and_flush(FreehandBase *dc, bool forceclosed)
     }
 
     // Step A - test, whether we ended on green anchor
-    if ( (forceclosed && 
+    if ( (forceclosed &&
          (!dc->sa || (dc->sa && dc->sa->curve->empty()))) ||
-         ( dc->green_anchor && dc->green_anchor->active)) 
+         ( dc->green_anchor && dc->green_anchor->active))
     {
         // We hit green anchor, closing Green-Blue-Red
         dc->getDesktop()->messageStack()->flash(Inkscape::NORMAL_MESSAGE, _("Path is closed."));

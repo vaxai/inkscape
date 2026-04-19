@@ -132,7 +132,7 @@ Inkscape::Colors::Color SPStop::getColor() const
     // Copy color from the right place
     Inkscape::Colors::Color color = style->stop_color.currentcolor ? style->color.getColor() : style->stop_color.getColor();
     // Bundle stop opacity into the color
-    color.addOpacity(style->stop_opacity);
+    color.addOpacity(style->stop_opacity.as_double());
     return color;
 }
 

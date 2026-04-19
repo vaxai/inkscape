@@ -274,12 +274,12 @@ void LaTeXTextRenderer::sp_text_render(SPText *textobj)
     Inkscape::Colors::Color color(0x0);
     if (style->fill.set && style->fill.isColor()) {
         color = style->fill.getColor();
-        color.addOpacity(style->fill_opacity);
+        color.addOpacity(style->fill_opacity.as_double());
     } else if (style->stroke.set && style->stroke.isColor()) {
         color = style->stroke.getColor();
-        color.addOpacity(style->stroke_opacity);
+        color.addOpacity(style->stroke_opacity.as_double());
     }
-    color.addOpacity(style->opacity);
+    color.addOpacity(style->opacity.as_double());
 
     // get rotation
     Geom::Affine i2doc = textobj->i2doc_affine();
@@ -323,7 +323,7 @@ void LaTeXTextRenderer::sp_text_render(SPText *textobj)
         for (Inkscape::Text::Layout::iterator li = layout.begin(), le = layout.end();
              li != le; li.nextStartOfSpan())
         {
-            Inkscape::Text::Layout::iterator ln = li; 
+            Inkscape::Text::Layout::iterator ln = li;
             ln.nextStartOfSpan();
             Glib::ustring uspanstr = sp_te_get_string_multiline (textobj, li, ln);
 
@@ -348,17 +348,17 @@ void LaTeXTextRenderer::sp_text_render(SPText *textobj)
                     spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_800 ||
                     spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_900 ||
                     spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLD ||
-                    spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLDER) 
+                    spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLDER)
                 {
                     is_bold = true;
                     os << "\\textbf{";
                 }
-                if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_ITALIC) 
+                if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_ITALIC)
                 {
                     is_italic = true;
                     os << "\\textit{";
                 }
-                if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_OBLIQUE) 
+                if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_OBLIQUE)
                 {
                     is_oblique = true;
                     os << "\\textsl{";  // this is an accurate choice if the LaTeX chosen font matches the font in Inkscape. Gives bad results when it is not so...
@@ -451,15 +451,15 @@ Flowing in rectangle is possible, not in arb shape.
     // TODO: how to handle ICC colors?
     // give priority to fill color
     guint32 rgba = 0;
-    float opacity = SP_SCALE24_TO_FLOAT(style->opacity.value);
+    float opacity = style->opacity.as_double();
     if (style->fill.set && style->fill.isColor()) {
         has_color = true;
         rgba = style->fill.getColor().toRGBA();
-        opacity *= SP_SCALE24_TO_FLOAT(style->fill_opacity.value);
+        opacity *= style->fill_opacity.as_double();
     } else if (style->stroke.set && style->stroke.isColor()) {
         has_color = true;
         rgba = style->stroke.getColor().toRGBA();
-        opacity *= SP_SCALE24_TO_FLOAT(style->stroke_opacity.value);
+        opacity *= style->stroke_opacity.as_double();
     }
     if (opacity < 1.0) {
         has_transparency = true;
@@ -494,7 +494,7 @@ Flowing in rectangle is possible, not in arb shape.
         // Walk through all spans in the text object.
         // Write span strings to LaTeX, associated with font weight and style.
         Inkscape::Text::Layout const &layout = *(te_get_layout(flowtext));
-        for (Inkscape::Text::Layout::iterator li = layout.begin(), le = layout.end(); 
+        for (Inkscape::Text::Layout::iterator li = layout.begin(), le = layout.end();
              li != le; li.nextStartOfSpan())
         {
             SPStyle const &spanstyle = *(sp_te_style_at_position(flowtext, li));
@@ -506,17 +506,17 @@ Flowing in rectangle is possible, not in arb shape.
                 spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_800 ||
                 spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_900 ||
                 spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLD ||
-                spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLDER) 
+                spanstyle.font_weight.computed == SP_CSS_FONT_WEIGHT_BOLDER)
             {
                 is_bold = true;
                 os << "\\textbf{";
             }
-            if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_ITALIC) 
+            if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_ITALIC)
             {
                 is_italic = true;
                 os << "\\textit{";
             }
-            if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_OBLIQUE) 
+            if (spanstyle.font_style.computed == SP_CSS_FONT_STYLE_OBLIQUE)
             {
                 is_oblique = true;
                 os << "\\textsl{";  // this is an accurate choice if the LaTeX chosen font matches the font in Inkscape. Gives bad results when it is not so...
@@ -530,7 +530,7 @@ Flowing in rectangle is possible, not in arb shape.
                 os << "\\textsubscript{";
             }
 
-            Inkscape::Text::Layout::iterator ln = li; 
+            Inkscape::Text::Layout::iterator ln = li;
             ln.nextStartOfSpan();
             Glib::ustring uspanstr = sp_te_get_string_multiline(flowtext, li, ln);
             const gchar *spanstr = uspanstr.c_str();

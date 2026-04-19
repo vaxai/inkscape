@@ -253,7 +253,7 @@ PaintAttribute::PaintStrip::PaintStrip(Glib::RefPtr<Gtk::Builder> builder, const
     _define(get_widget<Gtk::Button>(builder, "paint-add")),
     _clear(get_widget<Gtk::Button>(builder, "paint-clear")),
     _box(get_widget<Gtk::Box>(builder, "paint-buttons")),
-    _connection(PaintPopoverManager::get().register_button(_paint_btn, fill, 
+    _connection(PaintPopoverManager::get().register_button(_paint_btn, fill,
         [this]() { set_paint(_current_item); },
         [this]() { return connect_signals(); }
     ))
@@ -585,7 +585,7 @@ PaintMode PaintAttribute::PaintStrip::update_preview_indicators(const SPObject* 
     auto& style = object->style;
     auto& paint = *style->getFillOrStroke(_is_fill);
     auto mode = get_mode_from_paint(paint);
-    auto opacity = _is_fill ? style->fill_opacity : style->stroke_opacity;
+    auto opacity = _is_fill ? style->fill_opacity.as_double() : style->stroke_opacity.as_double();
     set_preview(paint, opacity, mode);
     return mode;
 }
@@ -596,12 +596,12 @@ void PaintAttribute::PaintStrip::set_paint(const SPObject* object) {
     if (_is_fill) {
         if (auto fill = object->style->getFillOrStroke(true)) {
             auto fill_rule = object->style->fill_rule.computed == SP_WIND_RULE_NONZERO ? FillRule::NonZero : FillRule::EvenOdd;
-            set_paint(*fill, object->style->fill_opacity, fill_rule);
+            set_paint(*fill, object->style->fill_opacity.as_double(), fill_rule);
         }
     }
     else {
         if (auto stroke = object->style->getFillOrStroke(false)) {
-            set_paint(*stroke, object->style->stroke_opacity, FillRule::NonZero);
+            set_paint(*stroke, object->style->stroke_opacity.as_double(), FillRule::NonZero);
         }
     }
 }
@@ -781,7 +781,7 @@ void PaintAttribute::insert_widgets(InkPropertyGrid& grid) {
         auto scoped(_update.block());
         if (clear) {
             item->style->opacity.clear();
-            _opacity.set_value(item->style->opacity);
+            _opacity.set_value(item->style->opacity.as_double());
         }
         else {
             item->style->opacity.set_double(opacity);
@@ -1010,7 +1010,7 @@ void PaintAttribute::update_from_object(SPObject* object) {
             show_stroke(false);
         }
 
-        double opacity = style->opacity;
+        double opacity = style->opacity.as_double();
         _opacity.set_value(opacity);
         update_reset_opacity_button();
 

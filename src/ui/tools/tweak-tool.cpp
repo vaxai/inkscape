@@ -90,7 +90,7 @@ TweakTool::TweakTool(SPDesktop *desktop)
     style_set_connection = desktop->connectSetStyle( // catch style-setting signal in this tool
         sigc::hide(sigc::mem_fun(*this, &TweakTool::set_style))
     );
-    
+
     Inkscape::Preferences *prefs = Inkscape::Preferences::get();
     if (prefs->getBool("/tools/tweak/selcue")) {
         enableSelectionCue();
@@ -107,11 +107,11 @@ TweakTool::~TweakTool()
 
 static bool is_transform_mode (gint mode)
 {
-    return (mode == TWEAK_MODE_MOVE || 
-            mode == TWEAK_MODE_MOVE_IN_OUT || 
-            mode == TWEAK_MODE_MOVE_JITTER || 
-            mode == TWEAK_MODE_SCALE || 
-            mode == TWEAK_MODE_ROTATE || 
+    return (mode == TWEAK_MODE_MOVE ||
+            mode == TWEAK_MODE_MOVE_IN_OUT ||
+            mode == TWEAK_MODE_MOVE_JITTER ||
+            mode == TWEAK_MODE_SCALE ||
+            mode == TWEAK_MODE_ROTATE ||
             mode == TWEAK_MODE_MORELESS);
 }
 
@@ -321,7 +321,7 @@ sp_tweak_dilate_recursive (Inkscape::Selection *selection, SPItem *item, Geom::P
         }
 
         for (auto i = children.rbegin(); i!= children.rend(); ++i) {
-            SPItem *child = *i; 
+            SPItem *child = *i;
             g_assert(child != nullptr);
             if (sp_tweak_dilate_recursive (selection, child, p, vector, mode, radius, force, fidelity, reverse)) {
                 did = true;
@@ -348,7 +348,7 @@ sp_tweak_dilate_recursive (Inkscape::Selection *selection, SPItem *item, Geom::P
                 double x = Geom::L2(a->midpoint() - p)/radius;
                 if (a->contains(p)) x = 0;
                 if (x < 1) {
-                    Geom::Point move = force * 0.5 * (cos(M_PI * x) + 1) * 
+                    Geom::Point move = force * 0.5 * (cos(M_PI * x) + 1) *
                         (reverse? (a->midpoint() - p) : (p - a->midpoint()));
                     item->move_rel(Geom::Translate(move * selection->desktop()->doc2dt().withoutTranslation()));
                     did = true;
@@ -606,7 +606,7 @@ static void tweak_stop_color(guint mode, SPStop *stop, Color const &goal, double
     static void
 tweak_opacity (guint mode, SPIScale24 *style_opacity, double opacity_goal, double force)
 {
-    double opacity = SP_SCALE24_TO_FLOAT (style_opacity->value);
+    double opacity = style_opacity->as_double();
 
     if (mode == TWEAK_MODE_COLORPAINT) {
         double d = opacity_goal - opacity;
@@ -615,7 +615,7 @@ tweak_opacity (guint mode, SPIScale24 *style_opacity, double opacity_goal, doubl
         opacity += g_random_double_range(-opacity, 1 - opacity) * force;
     }
 
-    style_opacity->value = SP_SCALE24_FROM_FLOAT(opacity);
+    style_opacity->set_double(opacity);
 }
 
 
@@ -770,7 +770,7 @@ static void tweak_colors_in_gradient(SPItem *item, Inkscape::PaintTarget fill_or
             for( unsigned i=0; i < array->nodes.size(); i+=3 ) {
                 for( unsigned j=0; j < array->nodes[i].size(); j+=3 ) {
                     SPStop *stop = array->nodes[i][j]->stop;
-                    double distance = Geom::L2(Geom::Point(p - array->nodes[i][j]->p)); 
+                    double distance = Geom::L2(Geom::Point(p - array->nodes[i][j]->p));
                     tweak_stop_color(mode, stop, goal,
                         force * tweak_profile (distance, radius), do_h, do_s, do_l);
                     stop->updateRepr();
@@ -975,7 +975,7 @@ sp_tweak_update_area (TweakTool *tc)
 {
     double radius = get_dilate_radius(tc);
     Geom::Affine const sm (Geom::Scale(radius, radius) * Geom::Translate(tc->getDesktop()->point()));
-    
+
     Geom::PathVector path = Geom::Path(Geom::Circle(0,0,1)); // Unit circle centered at origin.
     path *= sm;
     tc->dilate_area->set_bpath(path);

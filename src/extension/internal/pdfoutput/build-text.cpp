@@ -82,12 +82,12 @@ void TextContext::set_paint_style(StyleMap const &map, SPStyle const *style, SPS
     // but this bug is left in because it is not trivial to fix and is not possible to make an
     // SVG with the senario using Inkscape at the present time.
     if (map.contains(SPAttr::FILL)) {
-        if (auto color = _doc.get_paint(style->fill, context_style, get_softmask(style->fill_opacity))) {
+        if (auto color = _doc.get_paint(style->fill, context_style, get_softmask(style->fill_opacity.as_double()))) {
             _tx.set_nonstroke(*color);
         }
     }
     if (map.contains(SPAttr::STROKE)) {
-        if (auto color = _doc.get_paint(style->stroke, context_style, get_softmask(style->stroke_opacity))) {
+        if (auto color = _doc.get_paint(style->stroke, context_style, get_softmask(style->stroke_opacity.as_double()))) {
             _tx.set_stroke(*color);
         }
     }
@@ -112,7 +112,7 @@ void TextContext::set_paint_style(StyleMap const &map, SPStyle const *style, SPS
     if (!_soft_mask) {
         auto soft_mask = _doc.style_to_transparency_mask(style, nullptr);
 
-        if (soft_mask || last_ca < 1.0 || last_CA < 1.0 || style->fill_opacity < 1.0 || style->stroke_opacity < 1.0) {
+        if (soft_mask || last_ca < 1.0 || last_CA < 1.0 || style->fill_opacity.as_double() < 1.0 || style->stroke_opacity.as_double() < 1.0) {
             auto gstate = capypdf::GraphicsState();
             if (soft_mask) {
                 auto smask = capypdf::SoftMask(CAPY_SOFT_MASK_LUMINOSITY, *soft_mask);
@@ -121,10 +121,10 @@ void TextContext::set_paint_style(StyleMap const &map, SPStyle const *style, SPS
                 gstate.set_ca(1.0);
                 gstate.set_CA(1.0);
             } else {
-                gstate.set_ca(style->fill_opacity);
-                gstate.set_CA(style->stroke_opacity);
-                last_ca = style->fill_opacity;
-                last_CA = style->stroke_opacity;
+                gstate.set_ca(style->fill_opacity.as_double());
+                gstate.set_CA(style->stroke_opacity.as_double());
+                last_ca = style->fill_opacity.as_double();
+                last_CA = style->stroke_opacity.as_double();
             }
             auto gsid = _doc.generator().add_graphics_state(gstate);
             _tx.cmd_gs(gsid);

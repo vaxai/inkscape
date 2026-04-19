@@ -160,7 +160,7 @@ std::vector<PaintLayer> get_paint_layers(SPStyle const *style, SPStyle const *co
 bool style_needs_group(SPStyle const *style)
 {
     // These things are in the graphics-state, plus gradients and pattern use.
-    return style->opacity < 1.0 || get_blendmode(style->mix_blend_mode.value) ||
+    return style->opacity.as_double() < 1.0 || get_blendmode(style->mix_blend_mode.value) ||
            (style->fill.set && style->fill.href && style->fill.href->getObject()) ||
            (style->stroke.set && style->stroke.href && style->stroke.href->getObject());
 }
@@ -234,8 +234,8 @@ Document::get_group_graphics_state(SPStyle const *style, std::optional<CapyPDF_T
         gstate.set_BM(get_blendmode(style->mix_blend_mode.value));
         gs_used = true;
     }
-    if (style->opacity < 1.0) {
-        gstate.set_ca(style->opacity);
+    if (style->opacity.as_double() < 1.0) {
+        gstate.set_ca(style->opacity.as_double());
         gs_used = true;
     }
     if (gs_used) {
@@ -264,12 +264,12 @@ std::optional<CapyPDF_GraphicsStateId> Document::get_shape_graphics_state(SPStyl
         gstate.set_SMask(_gen.add_soft_mask(smask));
         gs_used = true;
     } else { // The draw opacities can not be set at the same time as a soft mask
-        if (style->fill_opacity < 1.0) {
-            gstate.set_ca(style->fill_opacity);
+        if (style->fill_opacity.as_double() < 1.0) {
+            gstate.set_ca(style->fill_opacity.as_double());
             gs_used = true;
         }
-        if (style->stroke_opacity < 1.0) {
-            gstate.set_CA(style->stroke_opacity);
+        if (style->stroke_opacity.as_double() < 1.0) {
+            gstate.set_CA(style->stroke_opacity.as_double());
             gs_used = true;
         }
     }
@@ -440,12 +440,12 @@ void DrawContext::set_paint_style(StyleMap const &map, SPStyle const *style, SPS
 {
     // NOTE: We might find out that fill_opacity.set is important for style cascading
     if (map.contains(SPAttr::FILL)) {
-        if (auto color = _doc.get_paint(style->fill, context_style, get_softmask(style->fill_opacity))) {
+        if (auto color = _doc.get_paint(style->fill, context_style, get_softmask(style->fill_opacity.as_double()))) {
             _ctx.set_nonstroke(*color);
         }
     }
     if (map.contains(SPAttr::STROKE)) {
-        if (auto color = _doc.get_paint(style->stroke, context_style, get_softmask(style->stroke_opacity))) {
+        if (auto color = _doc.get_paint(style->stroke, context_style, get_softmask(style->stroke_opacity.as_double()))) {
             _ctx.set_stroke(*color);
         }
     }

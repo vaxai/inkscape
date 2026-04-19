@@ -80,7 +80,7 @@ static double effective_opacity(SPItem const *item)
     double ret = 1.0;
     for (SPObject const *obj = item; obj; obj = obj->parent) {
         g_return_val_if_fail(obj->style, ret);
-        ret *= SP_SCALE24_TO_FLOAT(obj->style->opacity.value);
+        ret *= obj->style->opacity.as_double();
     }
     return ret;
 }
@@ -292,7 +292,7 @@ bool PovOutput::doCurve(SPItem *item, const String &id)
            flat colour. */
     if (style && style->fill.isColor()) {
         auto rgba = *style->fill.getColor().converted(Colors::Space::Type::RGB);
-        rgba.addOpacity(style->fill_opacity);
+        rgba.addOpacity(style->fill_opacity.as_double());
         rgba.addOpacity(effective_opacity(shape));
         String rgbf = "rgbf <";
         rgbf.append(dstr(rgba[0]));         rgbf.append(", ");

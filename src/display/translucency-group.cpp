@@ -4,7 +4,7 @@
  *
  * Author:
  *   Martin Owens <doctormo@geek-2.com>
- *   
+ *
  * Copyright (C) 2021-2024 Martin Owens
  *
  * Released under GNU GPL v2+, read the file 'COPYING' for more information.
@@ -34,18 +34,18 @@ void TranslucencyGroup::setSolidItem(SPItem *item)
 {
     if (item == _solid_item)
         return;
-  
+
     // Set the target item, this prevents rerunning rendering.
     _solid_item = item;
 
     // Reset all the items in the list.
     for (auto &item : _translucent_items) {
         if (auto arenaitem = item->get_arenaitem(_dkey)) {
-            arenaitem->setOpacity(SP_SCALE24_TO_FLOAT(item->style->opacity.value));
+            arenaitem->setOpacity(item->style->opacity.as_double());
         }
     }
     _translucent_items.clear();
-  
+
     if (item) {
         _generateTranslucentItems(item->document->getRoot());
 

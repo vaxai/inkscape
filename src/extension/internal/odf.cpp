@@ -1136,7 +1136,7 @@ bool OdfOutput::writeMeta(ZipFile &zf)
     {
         creator = iter->second;
     }
-    
+
     Glib::ustring date;
     Glib::ustring moddate;
     char buf [80];
@@ -1146,7 +1146,7 @@ bool OdfOutput::writeMeta(ZipFile &zf)
     timeinfo = localtime (&rawtime);
     strftime (buf,80,"%Y-%m-%d %H:%M:%S",timeinfo);
     moddate = Glib::ustring(buf);
-    
+
     iter = metadata.find("dc:date");
     if (iter != metadata.end())
     {
@@ -1277,13 +1277,13 @@ bool OdfOutput::processStyle(SPItem *item, const Glib::ustring &id, const Glib::
     {
         return false;
     }
-    
+
     SPStyle *style = item->style;
     if (!style)
     {
         return false;
     }
-    
+
     StyleInfo si;
 
     // FILL
@@ -1297,8 +1297,7 @@ bool OdfOutput::processStyle(SPItem *item, const Glib::ustring &id, const Glib::
         snprintf(buf, 15, "#%02x%02x%02x", r, g, b);
         si.fillColor = buf;
         si.fill      = "solid";
-        double opacityPercent = 100.0 *
-             (SP_SCALE24_TO_FLOAT(style->fill_opacity.value));
+        double opacityPercent = 100.0 * style->fill_opacity.as_double();
         snprintf(buf, 15, "%.3f%%", opacityPercent);
         si.fillOpacity = buf;
     }
@@ -1324,8 +1323,7 @@ bool OdfOutput::processStyle(SPItem *item, const Glib::ustring &id, const Glib::
         snprintf(buf, 15, "%.3fpt", style->stroke_width.value);
         si.strokeWidth = buf;
         si.stroke      = "solid";
-        double opacityPercent = 100.0 *
-             (SP_SCALE24_TO_FLOAT(style->stroke_opacity.value));
+        double opacityPercent = 100.0 * style->stroke_opacity.as_double();
         snprintf(buf, 15, "%.3f%%", opacityPercent);
         si.strokeOpacity = buf;
     }
@@ -1649,12 +1647,12 @@ bool OdfOutput::writeTree(Writer &couts, Writer &souts,
     Glib::ustring outputFill;
     Glib::ustring outputStroke;
     Glib::ustring outputStyle;
-    
+
     processGradient(item, id, tf, gradientNameFill, outputFill, true);
     processGradient(item, id, tf, gradientNameStroke, outputStroke, false);
     souts.writeUString(outputFill);
     souts.writeUString(outputStroke);
-    
+
     //# STYLE
     processStyle(item, id, gradientNameFill, gradientNameStroke, outputStyle);
     souts.writeUString(outputStyle);
@@ -1839,9 +1837,9 @@ bool OdfOutput::writeStyleFooter(Writer &outs)
     outs.writeString("<!-- ####### 'Standard' styles ####### -->\n");
     outs.writeString("<style:style style:name=\"dp1\" style:family=\"drawing-page\"/>\n");
     outs.writeString("<style:style style:name=\"standard\" style:family=\"graphic\">\n");
-    
+
 ///TODO: add default document style here
-    
+
     outs.writeString("</style:style>\n");
     outs.writeString("<style:style style:name=\"gr1\" style:family=\"graphic\" style:parent-style-name=\"standard\">\n");
     outs.writeString("  <style:graphic-properties draw:stroke=\"none\" draw:fill=\"none\"\n");

@@ -69,7 +69,7 @@ struct NRStyleData
     Paint stroke;
     float stroke_width;
     bool hairline;
-    float miter_limit;
+    double miter_limit;
     std::vector<double> dash;
     float dash_offset;
     cairo_fill_rule_t fill_rule;

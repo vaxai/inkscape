@@ -345,7 +345,7 @@ DrawingItem *DrawingShape::_pickItem(Geom::Point const &p, double delta, unsigne
     bool outline = flags & PICK_OUTLINE;
     bool pick_as_clip = flags & PICK_AS_CLIP;
 
-    if (SP_SCALE24_TO_FLOAT(style_opacity) == 0 && !outline && !pick_as_clip && !_drawing.selectZeroOpacity()) {
+    if (style_opacity == 0 && !outline && !pick_as_clip && !_drawing.selectZeroOpacity()) {
         // fully transparent, no pick unless outline mode
         return nullptr;
     }

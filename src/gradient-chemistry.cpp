@@ -673,7 +673,7 @@ guint sp_number_of_stops_before_stop(SPGradient* gradient, SPStop* target) {
         n++;
     }
     return n;
-} 
+}
 
 
 SPStop* sp_get_nth_stop(SPGradient* gradient, guint index) {
@@ -704,7 +704,7 @@ SPStop *sp_get_stop_i(SPGradient *gradient, guint stop_i)
     {
         stop_i--;
     }
-    
+
     for (guint i = 0; i < stop_i; i++) {
         if (!stop) {
             return nullptr;
@@ -1703,7 +1703,7 @@ static void addStop(Inkscape::XML::Node *parent, Color const &color, double opac
 #endif
     auto doc = parent->document();
     Inkscape::XML::Node *repr = doc->createElement("svg:stop");
-    
+
     Color copy = color;
     copy.addOpacity(opacity);
     SPStop::setColorRepr(repr, copy);
@@ -1784,7 +1784,7 @@ SPGradient *sp_gradient_vector_for_object( SPDocument *const doc, SPDesktop *con
             }
         } else if (paint.isColor()) {
             color = paint.getColor();
-            opacity = for_fill ? style.fill_opacity : style.stroke_opacity;
+            opacity = for_fill ? style.fill_opacity.as_double() : style.stroke_opacity.as_double();
         }
     }
 

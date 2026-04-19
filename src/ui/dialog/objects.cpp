@@ -352,7 +352,7 @@ void ObjectWatcher::updateRowInfo()
         row[_model->_colBlendMode] = blend;
         auto opacity = 1.0;
         if (item->style && item->style->opacity.set) {
-            opacity = SP_SCALE24_TO_FLOAT(item->style->opacity.value);
+            opacity = item->style->opacity.as_double();
         }
         row[_model->_colOpacity] = opacity;
         std::string item_state;
@@ -1320,7 +1320,7 @@ bool ObjectsPanel::blendModePopup(int const x, int const y, Gtk::TreeModel::Row 
 
     auto opacity = 1.0;
     if (item->style && item->style->opacity.set) {
-        opacity = SP_SCALE24_TO_FLOAT(item->style->opacity.value);
+        opacity = item->style->opacity.as_double();
     }
 
     for (auto const &btn : _blend_items) {

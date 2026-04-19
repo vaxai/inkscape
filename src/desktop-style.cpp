@@ -492,7 +492,7 @@ objects_query_fillstroke (const std::vector<SPItem*> &objects, SPStyle *style_re
         // 2. Sum color, copy server from paint to paint_res
         if (paint_res->set && paint->isColor()) {
             auto copy = paint->getColor();
-            copy.addOpacity(isfill ? style->fill_opacity : style->stroke_opacity);
+            copy.addOpacity(isfill ? style->fill_opacity.as_double() : style->stroke_opacity.as_double());
 
             if (colors.isEmpty()) {
                 paint_res->setColor(copy);
@@ -570,7 +570,7 @@ objects_query_opacity (const std::vector<SPItem*> &objects, SPStyle *style_res)
             continue;
         }
 
-        double opacity = SP_SCALE24_TO_FLOAT(style->opacity.value);
+        double opacity = style->opacity.as_double();
         opacity_sum += opacity;
         if (opacity_prev != -1 && opacity != opacity_prev) {
             same_opacity = false;
@@ -582,7 +582,7 @@ objects_query_opacity (const std::vector<SPItem*> &objects, SPStyle *style_res)
         opacity_sum /= opacity_items;
     }
 
-    style_res->opacity.value = SP_SCALE24_FROM_FLOAT(opacity_sum);
+    style_res->opacity.set_double(opacity_sum);
 
     if (opacity_items == 0) {
         return QUERY_STYLE_NOTHING;

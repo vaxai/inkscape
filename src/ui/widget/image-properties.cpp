@@ -48,7 +48,7 @@ Cairo::RefPtr<Cairo::Surface> draw_preview(SPImage* image, double width, double 
     opt.frame(frame_color);
     auto s = image->style;
     // here for preview purposes using image's own opacity only
-    double alpha = s && s->opacity.set && !s->opacity.inherit ? SP_SCALE24_TO_FLOAT(s->opacity.value) : 1.0;
+    double alpha = s && s->opacity.set && !s->opacity.inherit ? s->opacity.as_double() : 1.0;
     opt.image_opacity(alpha);
     opt.checkerboard(background);
     return r.render(*image, width, height, device_scale, opt);

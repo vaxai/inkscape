@@ -72,7 +72,7 @@ Inkscape::XML::Node* SPSolidColor::write(Inkscape::XML::Document* xml_doc, Inksc
 
 Inkscape::Colors::Color const SPSolidColor::getSolidColor() const
 {
-    return style->solid_color.getColor().withOpacity(style->solid_opacity);
+    return style->solid_color.getColor().withOpacity(style->solid_opacity.as_double());
 }
 
 /*

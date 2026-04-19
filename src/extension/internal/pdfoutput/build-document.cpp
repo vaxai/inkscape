@@ -116,14 +116,14 @@ Document::item_to_transparency_group(SPItem const *item, SPStyle const *context_
         if (fill_used) {
             std::optional<double> opacity;
             if (is_soft_mask) {
-                opacity = context_style->fill_opacity;
+                opacity = context_style->fill_opacity.as_double();
             }
             cache_key = {std::get<0>(cache_key), std::get<1>(cache_key), paint_to_cache_key(context_style->fill, opacity), std::get<3>(cache_key)};
         }
         if (stroke_used) {
             std::optional<double> opacity;
             if (is_soft_mask) {
-                opacity = context_style->stroke_opacity;
+                opacity = context_style->stroke_opacity.as_double();
             }
             cache_key = {std::get<0>(cache_key), std::get<1>(cache_key), std::get<2>(cache_key), paint_to_cache_key(context_style->stroke, opacity)};
         }

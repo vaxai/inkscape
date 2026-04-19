@@ -122,11 +122,11 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
             //std::cerr << "NRStyleData::set: 'context-stroke': 'context_style' is NULL" << std::endl;
         }
     }
-    
-    fill.set(style_fill);
-    fill.opacity = style->fill_opacity;
 
-    switch (style->fill_rule.computed) {
+    fill.set(style_fill);
+    fill.opacity = style->fill_opacity.as_double();
+
+    switch (style->fill_rule.as_enum()) {
         case SP_WIND_RULE_EVENODD:
             fill_rule = CAIRO_FILL_RULE_EVEN_ODD;
             break;
@@ -153,10 +153,10 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
     }
 
     stroke.set(style_stroke);
-    stroke.opacity = SP_SCALE24_TO_FLOAT(style->stroke_opacity.value);
-    stroke_width = style->stroke_width.computed;
+    stroke.opacity = style->stroke_opacity.as_double();
+    stroke_width = style->stroke_width.as_double();
     hairline = style->stroke_extensions.hairline;
-    switch (style->stroke_linecap.computed) {
+    switch (style->stroke_linecap.as_enum()) {
         case SP_STROKE_LINECAP_ROUND:
             line_cap = CAIRO_LINE_CAP_ROUND;
             break;
@@ -169,7 +169,7 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
         default:
             g_assert_not_reached();
     }
-    switch (style->stroke_linejoin.computed) {
+    switch (style->stroke_linejoin.as_enum()) {
         case SP_STROKE_LINEJOIN_ROUND:
             line_join = CAIRO_LINE_JOIN_ROUND;
             break;
@@ -182,14 +182,14 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
         default:
             g_assert_not_reached();
     }
-    miter_limit = style->stroke_miterlimit.value;
+    miter_limit = style->stroke_miterlimit.as_double();
 
     int const n_dash = style->stroke_dasharray.values.size();
     if (n_dash > 0 && style->stroke_dasharray.is_valid()) {
-        dash_offset = style->stroke_dashoffset.computed;
+        dash_offset = style->stroke_dashoffset.as_double();
         dash.resize(n_dash);
         for (int i = 0; i < n_dash; ++i) {
-            dash[i] = style->stroke_dasharray.values[i].computed;
+            dash[i] = style->stroke_dasharray.values[i].as_double();
         }
     }
 
@@ -224,17 +224,17 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
     if (style->text_decoration_style.dotted  ) { text_decoration_style |= TEXT_DECORATION_STYLE_DOTTED   + TEXT_DECORATION_STYLE_SET; }
     if (style->text_decoration_style.dashed  ) { text_decoration_style |= TEXT_DECORATION_STYLE_DASHED   + TEXT_DECORATION_STYLE_SET; }
     if (style->text_decoration_style.wavy    ) { text_decoration_style |= TEXT_DECORATION_STYLE_WAVY     + TEXT_DECORATION_STYLE_SET; }
- 
+
     /* FIXME
        The meaning of text-decoration-color in CSS3 for SVG is ambiguous (2014-05-06).  Set
        it for fill, for stroke, for both?  Both would seem like the obvious choice but what happens
        is that for text which is just fill (very common) it makes the lines fatter because it
        enables stroke on the decorations when it wasn't present on the text.  That contradicts the
        usual behavior where the text and decorations by default have the same fill/stroke.
-       
+
        The behavior here is that if color is defined it is applied to text_decoration_fill/stroke
        ONLY if the corresponding fill/stroke is also present.
-       
+
        Hopefully the standard will be clarified to resolve this issue.
     */
 
@@ -244,8 +244,8 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
     // decoration to the fill and stroke values of that ancestor.
     auto style_td = style;
     if (style->text_decoration.style_td) style_td = style->text_decoration.style_td;
-    text_decoration_stroke.opacity = SP_SCALE24_TO_FLOAT(style_td->stroke_opacity.value);
-    text_decoration_stroke_width = style_td->stroke_width.computed;
+    text_decoration_stroke.opacity = style_td->stroke_opacity.as_double();
+    text_decoration_stroke_width = style_td->stroke_width.as_double();
 
     // Priority is given in order:
     //   * text_decoration_fill
@@ -292,10 +292,10 @@ NRStyleData::NRStyleData(SPStyle const *style, SPStyle const *context_style)
         underline_position     = style->text_decoration_data.underline_position;
         line_through_thickness = style->text_decoration_data.line_through_thickness;
         line_through_position  = style->text_decoration_data.line_through_position;
-        font_size              = style->font_size.computed;
+        font_size              = style->font_size;
     }
 
-    text_direction = style->direction.computed;
+    text_direction = style->direction.as_enum();
 }
 
 auto NRStyle::preparePaint(Inkscape::DrawingContext &dc, Inkscape::RenderContext &rc, Geom::IntRect const &area, Geom::OptRect const &paintbox, Inkscape::DrawingPattern const *pattern, NRStyleData::Paint const &paint, CachedPattern const &cp) const -> CairoPatternUniqPtr

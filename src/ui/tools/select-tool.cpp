@@ -353,7 +353,7 @@ void SelectTool::sp_select_context_cycle_through_items(Selection *selection, Scr
             next = std::find( cycling_items.begin(), cycling_items.end(), cycling_cur_item );
             g_assert (next != cycling_items.end());
             if (next == cycling_items.begin()){
-                if ( cycling_wrap ) { 
+                if ( cycling_wrap ) {
                     next = cycling_items.end();
                     --next;
                 }
@@ -392,7 +392,7 @@ void SelectTool::sp_select_context_reset_opacities() {
     for (auto item : cycling_items_cmp) {
         if (item) {
             Inkscape::DrawingItem *arenaitem = item->get_arenaitem(_desktop->dkey);
-            arenaitem->setOpacity(SP_SCALE24_TO_FLOAT(item->style->opacity.value));
+            arenaitem->setOpacity(item->style->opacity.as_double());
         } else {
             g_assert_not_reached();
         }
@@ -927,7 +927,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_Up: // move selection up
                 case GDK_KEY_KP_Up:
                     if (!mod_ctrl(event)) { // not ctrl
@@ -935,7 +935,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_Right: // move selection right
                 case GDK_KEY_KP_Right:
                     if (!mod_ctrl(event)) { // not ctrl
@@ -943,7 +943,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_Down: // move selection down
                 case GDK_KEY_KP_Down:
                     if (!mod_ctrl(event)) { // not ctrl
@@ -951,12 +951,12 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_Escape:
                     if (!sp_select_context_abort()) {
                         selection->clear();
                     }
-                    
+
                     ret = true;
                     break;
 
@@ -967,7 +967,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_space:
                 case GDK_KEY_c:
                 case GDK_KEY_C:
@@ -977,7 +977,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_Return:
                     if (mod_ctrl_only(event)) {
                         if (selection->singleItem()) {
@@ -990,29 +990,29 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                                 _desktop->messageStack()->flash(Inkscape::NORMAL_MESSAGE, _("Selected object is not a group. Cannot enter."));
                             }
                         }
-                        
+
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_BackSpace:
                     if (mod_ctrl_only(event)) {
                         sp_select_context_up_one_layer(_desktop);
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_s:
                 case GDK_KEY_S:
                     if (mod_shift_only(event)) {
                         if (!selection->isEmpty()) {
                             _seltrans->increaseState();
                         }
-                        
+
                         ret = true;
                     }
                     break;
-                    
+
                 case GDK_KEY_g:
                 case GDK_KEY_G:
                     if (mod_shift_only(event)) {
@@ -1020,7 +1020,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
                         ret = true;
                     }
                     break;
-                    
+
                 default:
                     break;
             }
@@ -1031,7 +1031,7 @@ bool SelectTool::root_handler(CanvasEvent const &event)
             if (key_is_a_modifier (keyval)) {
                 defaultMessageContext()->clear();
             }
-            
+
             // Workaround for non-working modifier detection
             bool alt = keyval == GDK_KEY_Alt_L  ||
                        keyval == GDK_KEY_Alt_R  ||

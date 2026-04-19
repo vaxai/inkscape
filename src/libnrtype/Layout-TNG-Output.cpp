@@ -32,7 +32,7 @@ namespace Text {
 /*
  dx array (character widths) and
  ky (vertical kerning for entire span)
- rtl (+1 for LTR, -1 RTL) 
+ rtl (+1 for LTR, -1 RTL)
 
  are smuggled through to the EMF (ignored by others) as:
     text<nul>N w1 w2 w3 ...wN<nul>y1 y2 y3 .. yN<nul><nul>
@@ -305,7 +305,7 @@ Geom::Affine glyph_matrix;
         int oldtarget = 0;
         int ndx = 0;
         double rtl = 1.0;        // 1 L->R, -1 R->L, constant across a span. 1.0 for t->b b->t???
-        
+
         for (unsigned char_index = 0 ; char_index < _characters.size() ; ) {
             Glib::ustring text_string;  // accumulate text for record in this
             Geom::Point g_pos(0,0);     // all strings are output at (0,0) because we do the translation using the matrix
@@ -353,7 +353,7 @@ Geom::Affine glyph_matrix;
 
                 // always append if here
                 text_string += *text_iter;
-                
+
                 // figure out char widths, used by EMF, not currently used elsewhere
                 double cwidth;
                 if(lc_index == _glyphs[glyph_index].in_character){  // Glyph width is used only for the first character, these may be 0
@@ -365,24 +365,24 @@ Geom::Affine glyph_matrix;
                 char_x += cwidth;
 /*
 std:: cout << "DEBUG Layout::print in while "
-<< " char_index "  << char_index  
-<< " lc_index "    << lc_index 
-<< " character "   << std::hex << (int) *text_iter << std::dec 
-<< " glyph_index " << glyph_index 
+<< " char_index "  << char_index
+<< " lc_index "    << lc_index
+<< " character "   << std::hex << (int) *text_iter << std::dec
+<< " glyph_index " << glyph_index
 << " glyph_xy " << _glyphs[glyph_index].x << " , " << _glyphs[glyph_index].y
-<< " span_index "  << span_index 
-<< " hold_iisi  "  << hold_iisi 
+<< " span_index "  << span_index
+<< " hold_iisi  "  << hold_iisi
 << std::endl; //DEBUG
 */
                 if(ndx < MAX_DX){
-                    hold_dx[ndx++] = fabs(cwidth); 
+                    hold_dx[ndx++] = fabs(cwidth);
                 }
                 else { // silently truncate any text line silly enough to be longer than MAX_DX
                     lc_index = _characters.size();
                     break;
                 }
-                
-                
+
+
                 // conditions that prevent this character from joining the record
                 lc_index++;
                 if(lc_index >= _characters.size()) break; // nothing more to process, so it must be the end of the record
@@ -398,13 +398,13 @@ std:: cout << "DEBUG Layout::print in while "
                     */
 /*
 std:: cout << "DEBUG Layout::print in while  ---  "
-<< " char_index "  << char_index  
-<< " lc_index "    << lc_index 
+<< " char_index "  << char_index
+<< " lc_index "    << lc_index
 << " cwidth " << cwidth
 << " _char.x (next) " << (lc_index < _characters.size() ? _characters[lc_index].x : -1)
-<< " char_x (end this)" << char_x 
+<< " char_x (end this)" << char_x
 << " diff " << fabs(char_x - _characters[lc_index].x)
-<< " oldy " << ky 
+<< " oldy " << ky
 << " nexty " << _glyphs[_characters[lc_index].in_glyph].y
 << std::endl; //DEBUG
 */
@@ -412,14 +412,14 @@ std:: cout << "DEBUG Layout::print in while  ---  "
                     if(fabs(char_x - _spans[next_span_index].x_start) >= 1e-4)break;    // xkerning change
                     if(ky != _glyphs[_characters[lc_index].in_glyph].y)break;           // ykerning change
                     /*
-                       None of the above?  Then this is a minor "pangito", update span_index and keep going.  
+                       None of the above?  Then this is a minor "pangito", update span_index and keep going.
                        The font used by the display may have failed over, but print does not care and can continue to use
                        whatever was specified in the XML.
                     */
                     span_index  = next_span_index;
                     text_iter   = _spans[span_index].input_stream_first_character;
                 }
-                
+
             }
             // write it
             ctx->bind(glyph_matrix, 1.0);
@@ -427,7 +427,7 @@ std:: cout << "DEBUG Layout::print in while  ---  "
             // the dx array is smuggled through to the EMF driver (ignored by others) as:
             //    text<nul>w1 w2 w3 ...wn<nul><nul>
             // where the widths are floats 7 characters wide, including the space
-            
+
             char *smuggle_string=smuggle_adxkyrtl_in(text_string.c_str(),ndx, &hold_dx[0], ky, rtl);
             ctx->text(smuggle_string, g_pos, text_source->style);
             free(smuggle_string);
@@ -512,7 +512,7 @@ void Layout::showGlyphs(CairoRenderContext *ctx) const
             font_matrix = flip_matrix * font_matrix;
 
             SPStyle const *style = text_source->style;
-            float opacity = SP_SCALE24_TO_FLOAT(style->opacity.value);
+            double opacity = style->opacity.as_double();
 
             if (opacity != 1.0) {
                 ctx->pushState();
@@ -591,7 +591,7 @@ Glib::ustring Layout::dumpAsText() const
     Glib::ustring result;
     Glib::ustring::const_iterator icc;
     char line[256];
-    
+
     result = Glib::ustring::compose("spans     %1\nchars     %2\nglyphs    %3\n", _spans.size(), _characters.size(), _glyphs.size());
     if(_characters.size() > 1){
         unsigned lastspan=5000;
@@ -922,7 +922,7 @@ double Layout::getActualLength() const
     }
     return length;
 
-    
+
 }
 
 }//namespace Text
