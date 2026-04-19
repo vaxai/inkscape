@@ -100,10 +100,10 @@ is_relative_error_within_tolerance()
 # $1 - a floating point number.
 #
 # Output:
-# The result of multiplying the passed number by 100, rounded to 1 digit after the decimal point.
+# The result of multiplying the passed number by 100, rounded to 2 digits after the decimal point.
 fraction_to_percentage()
 {
-    local FORMULA=$(printf "%.4f * 100" "$1")
+    local FORMULA=$(printf "%.5f * 100" "$1")
     echo "$FORMULA" | bc
 }
 

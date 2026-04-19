@@ -4,18 +4,22 @@
 MY_LOCATION=$(dirname "$0")
 source "${MY_LOCATION}/../utils/functions.sh"
 
-command -v convert >/dev/null 2>&1 || { echo >&2 "I require ImageMagick's 'convert' but it's not installed.  Aborting."; exit 1; }
-command -v compare >/dev/null 2>&1 || { echo >&2 "I require ImageMagick's 'compare' but it's not installed.  Aborting."; exit 1; }
+ensure_command "convert"
+ensure_command "compare"
+ensure_command "bc"
+ensure_command "cp"
 
 OUTPUT_FILENAME=$1
 OUTPUT_PAGE=$2
 REFERENCE_FILENAME=$3
 EXPECTED_FILES=$4
 TEST_SCRIPT=$5
-
 get_outputs "$6"
-
 FUZZ=$7
+DPI=$8
+SUPERSAMPLING=$9
+
+export LC_NUMERIC=C
 
 # check if expected files exist
 for file in ${EXPECTED_FILES}; do
@@ -32,35 +36,57 @@ if [ -n "${REFERENCE_FILENAME}" ]; then
         echo "Error: Reference file '${REFERENCE_FILENAME}' not found."
         exit 1
     fi
-    if [ "${FUZZ}" -ne "0" ]; then
-        FUZZ="-fuzz ${FUZZ}%"
-    else
-        FUZZ=""
-    fi
 
-    # convert testfile and reference file to PNG format
+    # Convert the output and reference files to the PNG format
     # - use internal MSVG delegate in SVG conversions for reproducibility reasons (avoid inkscape or rsvg delegates)
     [ "${OUTPUT_FILENAME##*.}"    = "svg" ] && delegate1=MSVG:
     [ "${REFERENCE_FILENAME##*.}" = "svg" ] && delegate2=MSVG:
 
-    # extract a page from multipage PDF if requested and convert it to RGB
+    CONVERSION_OPTIONS="-colorspace RGB"
+
+    # Extract a page from multipage PS/PDF if requested
     OUTFILE_SUFFIX=""
     if [ -n "$OUTPUT_PAGE" ]; then
-        OUTFILE_SUFFIX="[${OUTPUT_PAGE}] -colorspace RGB"
+        OUTFILE_SUFFIX="[${OUTPUT_PAGE}]" # Use ImageMagick's bracket operator
     fi
 
-    if ! convert ${delegate1}${OUTPUT_FILENAME}${OUTFILE_SUFFIX} ${PNG_FILENAME}; then
-        echo "Warning: Failed to convert test file '${OUTPUT_FILENAME}' to PNG format. Skipping comparison test."
-        exit 42
-    fi
-    if ! convert ${delegate2}${REFERENCE_FILENAME} ${PNG_REFERENCE}; then
-        echo "Warning: Failed to convert reference file '${REFERENCE_FILENAME}' to PNG format. Skipping comparison test."
-        exit 42
+    if [ -z "$DPI" ]; then
+        DPI=72
     fi
 
-    # compare files
-    if ! compare ${FUZZ} -metric AE ${PNG_REFERENCE} ${PNG_FILENAME} ${PNG_COMPARE}; then
-        echo && echo "Error: Comparison failed."
+    if [ -z "$SUPERSAMPLING" ]; then
+        SUPERSAMPLING=1
+    fi
+
+    if [[ $(identify -format "%m" "${OUTPUT_FILENAME}") != "PNG" ]] then
+        echo -density "%[fx:$DPI*$SUPERSAMPLING]" ${delegate1}${OUTPUT_FILENAME}${OUTFILE_SUFFIX} ${CONVERSION_OPTIONS} -resize "%[fx:100/$SUPERSAMPLING]%" ${PNG_FILENAME}
+        if ! magick -density "%[fx:$DPI*$SUPERSAMPLING]" ${delegate1}${OUTPUT_FILENAME}${OUTFILE_SUFFIX} ${CONVERSION_OPTIONS} -resize "%[fx:100/$SUPERSAMPLING]%" ${PNG_FILENAME}; then
+            echo "Warning: Failed to convert test file '${OUTPUT_FILENAME}' to PNG format. Skipping comparison test."
+            exit 42
+        fi
+    else
+        cp "${OUTPUT_FILENAME}" "${PNG_FILENAME}"
+    fi
+    if [[ $(identify -format "%m" "${REFERENCE_FILENAME}") != "PNG" ]] then
+        if ! magick -density "%[fx:$DPI*$SUPERSAMPLING]" ${delegate2}${REFERENCE_FILENAME} ${CONVERSION_OPTIONS} -resize "%[fx:100/$SUPERSAMPLING]%" ${PNG_REFERENCE}; then
+            echo "Warning: Failed to convert reference file '${REFERENCE_FILENAME}' to PNG format. Skipping comparison test."
+            exit 42
+        fi
+    else
+        cp "${REFERENCE_FILENAME}" "${PNG_REFERENCE}"
+    fi
+
+    # Compare the two files
+    COMPARE_OUTPUT=$(compare 2>&1 -metric RMSE "${PNG_FILENAME}" "${PNG_REFERENCE}" "${PNG_COMPARE}")
+    RELATIVE_ERROR=$(get_compare_result "$COMPARE_OUTPUT")
+    PERCENTAGE_ERROR=$(fraction_to_percentage "$RELATIVE_ERROR")
+    if (( $(is_relative_error_within_tolerance "$RELATIVE_ERROR" "$FUZZ") )) then
+        # Test passed: print stats and clean up the files.
+        echo "Fuzzy comparison PASSED; error of ${PERCENTAGE_ERROR}% is within ${FUZZ}% tolerance."
+    else
+        # Test failed!
+        echo "Fuzzy comparison FAILED; error of ${PERCENTAGE_ERROR}% exceeds ${FUZZ}% tolerance."
+        keep_outputs
         exit 1
     fi
 fi

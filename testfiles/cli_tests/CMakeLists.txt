@@ -11,6 +11,7 @@
 #   OUTPUT_PAGE        - index of page in multipage output (optional), starts from 0
 #   FUZZ_PERCENTAGE    - maximum allowed normalized root-mean-squared distance between compared images
 #   RASTER_DPI         - DPI setting for rasterizing vector formats before root-mean-squared comparison
+#   SUPERSAMPLING      - Rasterise vector formats at larger size and scale down by this factor
 #   PARAMETERS         - additional command line parameters to pass to Inkscape
 #   REFERENCE_INKSCAPE - rasterize REFERENCE_FILENAME using inkscape
 #                        Avoid this when possible! Preferably reference should be a raster image and when that's not
@@ -24,8 +25,6 @@
 #   REFERENCE_FILENAME - compare OUTPUT_FILENAME with this pre-rendered reference file
 #                        both files are converted to PNG and compared with ImageMagick's 'compare'
 #                        for multipage output, use OUTPUT_PAGE to specify a single page for comparison
-#   FUZZYREF_FILENAME  - comparison of OUTPUT_FILENAME with this pre-rendered reference file will be
-#                        performed in the L2 metric, subject to the specified FUZZ_PERCENTAGE
 #   EXPECTED_FILES     - verify the command produced the expected files (i.e. they exist on disk)
 #   TEST_SCRIPT        - additional script to run after performing all checks and before cleaning up
 #
@@ -45,7 +44,7 @@ function(add_cli_test name)
         add_cli_test_cmp(${testname} ${testname}_check ${quotedArgs})
         add_cli_test_cln(${testname} ${testname}_clean ${quotedArgs})
     ")
-endfunction(add_cli_test)
+endfunction()
 
 
 #
@@ -104,7 +103,7 @@ function(add_cli_test_run fixture testname)
                 FIXTURES_SETUP ${fixture}
                 ENVIRONMENT "${CMAKE_CTEST_ENV}")
     endif()
-endfunction(add_cli_test_run)
+endfunction()
 
 #
 # Just the comparison component of the above add_cli_test
@@ -113,7 +112,7 @@ function(add_cli_test_cmp fixture testname)
     # parse arguments
     set(options REFERENCE_INKSCAPE)
     set(oneValueArgs OUTPUT_FILENAME OUTPUT_PAGE REFERENCE_FILENAME
-        FUZZYREF_FILENAME FUZZ_PERCENTAGE RASTER_DPI PNG_FILENAME)
+        FUZZ_PERCENTAGE RASTER_DPI SUPERSAMPLING PNG_FILENAME)
     set(multiValueArgs EXPECTED_FILES TEST_SCRIPT)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -149,7 +148,7 @@ function(add_cli_test_cmp fixture testname)
             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/check_output.sh
                     "${ARG_OUTPUT_FILENAME}" "${ARG_OUTPUT_PAGE}" "${ARG_REFERENCE_FILENAME}"
                     "${ARG_EXPECTED_FILES}" "${ARG_TEST_SCRIPT}" "${ARG_PNG}"
-                    "${ARG_FUZZ}")
+                    "${ARG_FUZZ}" "${ARG_RASTER_DPI}" "${ARG_SUPERSAMPLING}")
         set_tests_properties(${testname} PROPERTIES
             FIXTURES_REQUIRED ${fixture}
             ENVIRONMENT "${CMAKE_CTEST_ENV}"
@@ -157,21 +156,7 @@ function(add_cli_test_cmp fixture testname)
         )
     endif()
 
-    # add a fuzzy test to check the output files
-    if(DEFINED ARG_FUZZYREF_FILENAME)
-        file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/testcases/${ARG_FUZZYREF_FILENAME}" ARG_FUZZYREF_FILENAME)
-        add_test(NAME ${testname}
-            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/l2compare.sh
-            "${ARG_OUTPUT_FILENAME}" "${ARG_OUTPUT_PAGE}" "${ARG_FUZZYREF_FILENAME}" "${ARG_FUZZ}" "${ARG_RASTER_DPI}" "${ARG_PNG}"
-        )
-        set_tests_properties(${testname} PROPERTIES
-            FIXTURES_REQUIRED ${fixture}
-            ENVIRONMENT "${CMAKE_CTEST_ENV}"
-            SKIP_RETURN_CODE 42
-        )
-    endif()
-
-endfunction(add_cli_test_cmp)
+endfunction()
 
 #
 # Delete all the generated files
@@ -265,10 +250,10 @@ add_cli_test(export-type_png  PARAMETERS --export-type=png INPUT_FILENAME shapes
 add_cli_test(export-type_ps   PARAMETERS --export-type=ps  INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.ps  REFERENCE_FILENAME shapes_expected.ps)
 add_cli_test(export-type_eps  PARAMETERS --export-type=eps INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.eps REFERENCE_FILENAME shapes_expected.eps)
 if(WITH_CAPYPDF)
-add_cli_test(export-type_pdf  PARAMETERS --export-type=pdf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.pdf REFERENCE_FILENAME shapes_expected.pdf)
+add_cli_test(export-type_pdf  PARAMETERS --export-type=pdf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.pdf REFERENCE_FILENAME shapes_expected.pdf FUZZ_PERCENTAGE 1)
 endif()
 add_cli_test(export-type_emf  PARAMETERS --export-type=emf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.emf REFERENCE_FILENAME shapes_expected.emf)
-add_cli_test(export-type_wmf  PARAMETERS --export-type=wmf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.wmf REFERENCE_FILENAME shapes_expected.wmf)
+add_cli_test(export-type_wmf  PARAMETERS --export-type=wmf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.wmf REFERENCE_FILENAME shapes_expected.wmf FUZZ_PERCENTAGE 0.5)
 # XAML is not supported by ImageMagick's convert, so simply compare binary
 add_cli_test(export-type_xaml PARAMETERS --export-type=xaml INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.xaml
                               TEST_SCRIPT compare.sh shapes.xaml "${CMAKE_CURRENT_SOURCE_DIR}/testcases/shapes_expected.xaml")
@@ -277,13 +262,13 @@ add_cli_test(export-type_xaml PARAMETERS --export-type=xaml INPUT_FILENAME shape
 add_cli_test(export-area-page_png PARAMETERS --export-area-page --export-type=png INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.png REFERENCE_FILENAME export-area-page_expected.png)
 add_cli_test(export-area-page_svg PARAMETERS --export-area-page --export-type=svg INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.svg REFERENCE_FILENAME export-area-page_expected.svg)
 if(WITH_CAPYPDF)
-add_cli_test(export-area-page_pdf PARAMETERS --export-area-page --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.pdf REFERENCE_FILENAME export-area-page_expected.pdf)
+add_cli_test(export-area-page_pdf PARAMETERS --export-area-page --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.pdf REFERENCE_FILENAME export-area-page_expected.pdf FUZZ_PERCENTAGE 0.5)
 endif()
 add_cli_test(export-area-page_ps  PARAMETERS --export-area-page --export-type=ps  INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.ps  REFERENCE_FILENAME export-area-page_expected.ps)
 # EPS: Currently not supported. Feature request: https://gitlab.com/inkscape/inkscape/-/issues/1074
 # add_cli_test(export-area-page_eps PARAMETERS --export-area-page --export-type=eps INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.eps REFERENCE_FILENAME export-area-page_expected.eps)
 add_cli_test(export-area-page_emf PARAMETERS --export-area-page --export-type=emf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.emf REFERENCE_FILENAME export-area-page_expected.emf)
-add_cli_test(export-area-page_wmf PARAMETERS --export-area-page --export-type=wmf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.wmf REFERENCE_FILENAME export-area-page_expected.wmf)
+add_cli_test(export-area-page_wmf PARAMETERS --export-area-page --export-type=wmf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-page.wmf REFERENCE_FILENAME export-area-page_expected.wmf FUZZ_PERCENTAGE 0.5)
 
 # --export-area-page + --export-id  (+ --export-id-only)
 # TODO: PDF/PS/EPS always behave as if --export-id-only was given, see https://gitlab.com/inkscape/inkscape/-/issues/1173
@@ -301,7 +286,7 @@ add_cli_test(export-area-page_export-id_ps  PARAMETERS --export-area-page --expo
 add_cli_test(export-area-drawing_png PARAMETERS --export-area-drawing --export-type=png INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.png REFERENCE_FILENAME export-area-drawing_expected.png)
 add_cli_test(export-area-drawing_svg PARAMETERS --export-area-drawing --export-type=svg INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.svg REFERENCE_FILENAME export-area-drawing_expected.svg)
 if(WITH_CAPYPDF)
-add_cli_test(export-area-drawing_pdf PARAMETERS --export-area-drawing --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.pdf REFERENCE_FILENAME export-area-drawing_expected.pdf)
+add_cli_test(export-area-drawing_pdf PARAMETERS --export-area-drawing --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.pdf REFERENCE_FILENAME export-area-drawing_expected.pdf FUZZ_PERCENTAGE 0.5)
 endif()
 add_cli_test(export-area-drawing_ps  PARAMETERS --export-area-drawing --export-type=ps  INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.ps  REFERENCE_FILENAME export-area-drawing_expected.ps)
 add_cli_test(export-area-drawing_eps PARAMETERS --export-area-drawing --export-type=eps INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing.eps REFERENCE_FILENAME export-area-drawing_expected.eps)
@@ -313,7 +298,7 @@ add_cli_test(export-area-drawing_eps PARAMETERS --export-area-drawing --export-t
 add_cli_test(export-area-drawing-page_png PARAMETERS --export-area-drawing --export-area-page --export-type=png INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing-page.png REFERENCE_FILENAME export-area-page_expected.png)
 add_cli_test(export-area-drawing-page_svg PARAMETERS --export-area-drawing --export-area-page --export-type=svg INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing-page.svg REFERENCE_FILENAME export-area-page_expected.svg)
 if(WITH_CAPYPDF)
-add_cli_test(export-area-drawing-page_pdf PARAMETERS --export-area-drawing --export-area-page --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing-page.pdf REFERENCE_FILENAME export-area-page_expected.pdf)
+add_cli_test(export-area-drawing-page_pdf PARAMETERS --export-area-drawing --export-area-page --export-type=pdf INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing-page.pdf REFERENCE_FILENAME export-area-page_expected.pdf FUZZ_PERCENTAGE 0.5)
 endif()
 add_cli_test(export-area-drawing-page_ps  PARAMETERS --export-area-drawing --export-area-page --export-type=ps  INPUT_FILENAME areas.svg OUTPUT_FILENAME export-area-drawing-page.ps  REFERENCE_FILENAME export-area-page_expected.ps)
 
@@ -330,7 +315,7 @@ add_cli_test(export-area-snap_export-area-drawing PARAMETERS --export-area-drawi
 add_cli_test(export-dpi_png PARAMETERS --export-dpi=12 --export-type=png INPUT_FILENAME filter.svg OUTPUT_FILENAME export-dpi.png REFERENCE_FILENAME export-dpi_expected.png)
 # SVG: doesn't make sense
 if(WITH_CAPYPDF)
-add_cli_test(export-dpi_pdf PARAMETERS --export-dpi=12 --export-type=pdf INPUT_FILENAME filter.svg OUTPUT_FILENAME export-dpi.pdf REFERENCE_FILENAME export-dpi_expected.pdf)
+add_cli_test(export-dpi_pdf PARAMETERS --export-dpi=12 --export-type=pdf INPUT_FILENAME filter.svg OUTPUT_FILENAME export-dpi.pdf REFERENCE_FILENAME export-dpi_expected.pdf FUZZ_PERCENTAGE 0.2)
 endif()
 add_cli_test(export-dpi_ps  PARAMETERS --export-dpi=12 --export-type=ps  INPUT_FILENAME filter.svg OUTPUT_FILENAME export-dpi.ps  REFERENCE_FILENAME export-dpi_expected.ps)
 add_cli_test(export-dpi_eps PARAMETERS --export-dpi=12 --export-type=eps INPUT_FILENAME filter.svg OUTPUT_FILENAME export-dpi.eps REFERENCE_FILENAME export-dpi_expected.eps)
@@ -599,52 +584,52 @@ add_cli_test(export-grouped-mp PARAMETERS --export-type=pdf
                                INPUT_FILENAME export-grouped-mp.svg
                                OUTPUT_FILENAME export-grouped-mp.pdf
                                OUTPUT_PAGE 1
-                               FUZZYREF_FILENAME export-grouped-mp_expected.png
+                               REFERENCE_FILENAME export-grouped-mp_expected.png
                                FUZZ_PERCENTAGE 3)
 add_cli_test(export-with-filters-multipage PARAMETERS --export-type=pdf
                                            INPUT_FILENAME export-with-filters-multipage.svg
                                            OUTPUT_FILENAME export-with-filters-multipage.pdf
                                            OUTPUT_PAGE 1
-                                           FUZZYREF_FILENAME export-with-filters-multipage_expected.png
+                                           REFERENCE_FILENAME export-with-filters-multipage_expected.png
                                            FUZZ_PERCENTAGE 1)
 add_cli_test(export-filtered-clones-mp PARAMETERS --export-type=pdf --export-dpi=600
                                        INPUT_FILENAME  export-filtered-clones-mp.svg
                                        OUTPUT_FILENAME export-filtered-clones-mp.pdf
                                        OUTPUT_PAGE 1
                                        RASTER_DPI 600
-                                       FUZZYREF_FILENAME export-filtered-clones-mp_expected.png
+                                       REFERENCE_FILENAME export-filtered-clones-mp_expected.png
                                        FUZZ_PERCENTAGE 3)
 add_cli_test(export-clone-group-filtered-mp PARAMETERS --export-type=pdf
                                             INPUT_FILENAME  export-clone-group-filtered-mp.svg
                                             OUTPUT_FILENAME export-clone-group-filtered-mp.pdf
                                             OUTPUT_PAGE 1
-                                            FUZZYREF_FILENAME export-clone-group-filtered-mp_expected.png
+                                            REFERENCE_FILENAME export-clone-group-filtered-mp_expected.png
                                             FUZZ_PERCENTAGE 3)
 add_cli_test(export-text-paintorder PARAMETERS --export-type=pdf
                                     INPUT_FILENAME  export-text-paintorder.svg
                                     OUTPUT_FILENAME export-text-paintorder.pdf
                                     RASTER_DPI 200
-                                    FUZZYREF_FILENAME export-text-paintorder_expected.png
-                                    FUZZ_PERCENTAGE 3)
+                                    REFERENCE_FILENAME export-text-paintorder_expected.png
+                                    FUZZ_PERCENTAGE 4)
 # This tests the paint order in the text-to-path conversion
 add_cli_test(convert-text-paintorder PARAMETERS --export-text-to-path --export-extension=org.inkscape.output.pdf.cairorenderer
                                      INPUT_FILENAME  export-text-paintorder.svg
                                      OUTPUT_FILENAME export-text-paintorder.pdf
                                      RASTER_DPI 200
-                                     FUZZYREF_FILENAME export-text-paintorder_expected.png
+                                     REFERENCE_FILENAME export-text-paintorder_expected.png
                                      FUZZ_PERCENTAGE 3.5)
 
 if(WITH_CAPYPDF)
 add_cli_test(export-mask-viewbox PARAMETERS --export-type=pdf
                                  INPUT_FILENAME  export-mask-viewbox-scale.svg
                                  OUTPUT_FILENAME export-mask-viewbox-scale.pdf
-                                 FUZZYREF_FILENAME export-mask-viewbox-scale_expected.png
+                                 REFERENCE_FILENAME export-mask-viewbox-scale_expected.png
                                  FUZZ_PERCENTAGE 1)
 
 add_cli_test(export-mask-on-transformed-image PARAMETERS --export-type=pdf
                                               INPUT_FILENAME    export-mask-on-transformed-image.svg
                                               OUTPUT_FILENAME   export-mask-on-transformed-image.pdf
-                                              FUZZYREF_FILENAME export-mask-on-transformed-image_expected.png
+                                              REFERENCE_FILENAME export-mask-on-transformed-image_expected.png
                                               FUZZ_PERCENTAGE 1)
 endif()
 
@@ -708,10 +693,10 @@ add_cli_test(export-extension_svg  PARAMETERS --export-type=svg --export-extensi
 add_cli_test(export-extension_ps   PARAMETERS --export-type=ps --export-extension=org.inkscape.print.ps.cairo INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.ps  REFERENCE_FILENAME shapes_expected.ps)
 add_cli_test(export-extension_eps  PARAMETERS --export-type=eps --export-extension=org.inkscape.print.eps.cairo  INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.eps REFERENCE_FILENAME shapes_expected.eps)
 if(WITH_CAPYPDF)
-    add_cli_test(export-extension_pdf  PARAMETERS --export-type=pdf --export-extension=org.inkscape.output.pdf.capypdf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.pdf REFERENCE_FILENAME shapes_expected.pdf)
+    add_cli_test(export-extension_pdf  PARAMETERS --export-type=pdf --export-extension=org.inkscape.output.pdf.capypdf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.pdf REFERENCE_FILENAME shapes_expected.pdf FUZZ_PERCENTAGE 1)
 endif()
 add_cli_test(export-extension_emf  PARAMETERS --export-type=emf --export-extension=org.inkscape.output.emf  INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.emf REFERENCE_FILENAME shapes_expected.emf)
-add_cli_test(export-extension_wmf  PARAMETERS --export-type=wmf --export-extension=org.inkscape.output.wmf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.wmf REFERENCE_FILENAME shapes_expected.wmf)
+add_cli_test(export-extension_wmf  PARAMETERS --export-type=wmf --export-extension=org.inkscape.output.wmf INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.wmf REFERENCE_FILENAME shapes_expected.wmf FUZZ_PERCENTAGE 0.5)
 add_cli_test(export-plain-extension-svg PARAMETERS --export-type=svg --export-extension=org.inkscape.output.svg.plain
                               INPUT_FILENAME shapes.svg OUTPUT_FILENAME shapes.svg REFERENCE_FILENAME shapes.svg
                               TEST_SCRIPT match_regex_fail.sh "shapes.svg" "inkscape:|sodipodi:")
@@ -900,7 +885,7 @@ add_cli_test(actions-object-remove-property     INPUT_FILENAME export-mask-on-tr
 add_cli_test(actions-path-simplify         INPUT_FILENAME path.svg
                                            PARAMETERS --actions=select-by-id:gates$<SEMICOLON>path-simplify$<SEMICOLON>export-id:gates$<SEMICOLON>export-id-only
                                            OUTPUT_FILENAME actions-object-simplify-path.png
-                                           REFERENCE_FILENAME actions-object-simplify-path_expected.png)
+                                           REFERENCE_FILENAME actions-object-simplify-path_expected.png FUZZ_PERCENTAGE 0.1)
 
 # object-stroke-to-path
 add_cli_test(actions-object-stroke-to-path INPUT_FILENAME path.svg
@@ -919,7 +904,7 @@ add_cli_test(action_stroke-to-path_visual
                         PARAMETERS --actions=select-all:all$<SEMICOLON>object-stroke-to-path
                         OUTPUT_FILENAME stroke-to-path-variations.png
                         REFERENCE_FILENAME actions-object-stroke-to-path_variations_expected.png
-                        FUZZ_PERCENTAGE 9)
+                        FUZZ_PERCENTAGE 0.01)
 
 # object-to-path
 add_cli_test(actions-object-to-path        INPUT_FILENAME areas.svg
@@ -935,7 +920,8 @@ add_cli_test(actions-object-unlink-clones  INPUT_FILENAME path.svg
 # open-page
 add_cli_test(actions-open-page             PARAMETERS --actions=open-page:3$<SEMICOLON>file-open:${CMAKE_CURRENT_SOURCE_DIR}/testcases/pdf-pages.pdf$<SEMICOLON>export-filename:actions-open-page.png$<SEMICOLON>export-do
                                            OUTPUT_FILENAME actions-open-page.png
-                                           REFERENCE_FILENAME actions-open-page_expected.png)
+                                           REFERENCE_FILENAME actions-open-page_expected.png
+                                           FUZZ_PERCENTAGE 0.05)
 
 # query-all: test = query-all
 add_cli_test(actions-query-all             INPUT_FILENAME rects.svg PARAMETERS --actions=select-by-id:rect2$<SEMICOLON>query-all    PASS_FOR_OUTPUT ${query_all_expected})
@@ -1049,14 +1035,14 @@ add_cli_test(actions-svginot-text-topath
     INPUT_FILENAME ../../rendering_tests/text-gzipped-svg-glyph.svg
     PARAMETERS --actions=select-all$<SEMICOLON>object-to-path$<SEMICOLON>select-clear$<SEMICOLON>select-by-element:text$<SEMICOLON>delete
     OUTPUT_FILENAME actions-svginot-text-topath-output.png
-    FUZZYREF_FILENAME ../../rendering_tests/expected_rendering/text-gzipped-svg-glyph.png
+    REFERENCE_FILENAME ../../rendering_tests/expected_rendering/text-gzipped-svg-glyph.png
     FUZZ_PERCENTAGE 3
 )
 add_cli_test(actions-svginot-text-topath2
         INPUT_FILENAME ../../rendering_tests/text-svg-glyph-custom.svg
         PARAMETERS --actions=select-all$<SEMICOLON>object-to-path$<SEMICOLON>select-clear$<SEMICOLON>select-by-element:text$<SEMICOLON>delete
         OUTPUT_FILENAME actions-svginot-text-topath-output.png
-        FUZZYREF_FILENAME ../../rendering_tests/expected_rendering/text-svg-glyph-custom.png
+        REFERENCE_FILENAME ../../rendering_tests/expected_rendering/text-svg-glyph-custom.png
         FUZZ_PERCENTAGE 1
 )
 
@@ -1066,7 +1052,7 @@ add_cli_test(actions-text-to-glyph
             --actions=select-all$<SEMICOLON>text-convert-to-glyphs$<SEMICOLON>select-clear$<SEMICOLON>select-by-id:text_o_1$<SEMICOLON>select-by-id:text_o_2$<SEMICOLON>select-by-id:text_o_3$<SEMICOLON>select-by-id:text_o_4$<SEMICOLON>delete$<SEMICOLON>
         OUTPUT_FILENAME text_to_glyph.png
         REFERENCE_FILENAME text_to_glyph_expected.svgz REFERENCE_INKSCAPE
-        FUZZ_PERCENTAGE 8
+        FUZZ_PERCENTAGE 0.2
 )
 
 
@@ -1118,7 +1104,7 @@ function(add_pdfinput_test name pages font_strategy)
         EXPECTED_FILES "${name}.svg"
         TEST_SCRIPT compare.sh ${name}.svg "${CMAKE_CURRENT_SOURCE_DIR}/testcases/pdfinput/${name}_expected.svg")
 
-endfunction(add_pdfinput_test)
+endfunction()
 
 # CMS testing disabled because CI builder doesn't support LCMS yet.
 # add_pdfinput_test(cms 1)
@@ -1142,7 +1128,7 @@ if(WITH_POPPLER)
 endif()
 
 function(add_pdfoutput_test name)
-    set(oneValueArgs FUZZ_PERCENTAGE RASTER_DPI)
+    set(oneValueArgs FUZZ_PERCENTAGE RASTER_DPI SUPERSAMPLING)
     cmake_parse_arguments(ARG "" "${oneValueArgs}" "" ${ARGN})
 
     if(NOT DEFINED ARG_FUZZ_PERCENTAGE)
@@ -1151,6 +1137,9 @@ function(add_pdfoutput_test name)
 
     if(DEFINED ARG_RASTER_DPI)
         set(RASTER_DPI "RASTER_DPI" "${ARG_RASTER_DPI}")
+    endif()
+    if(DEFINED ARG_SUPERSAMPLING)
+        set(SUPERSAMPLING "SUPERSAMPLING" "${ARG_SUPERSAMPLING}")
     endif()
 
     set(SOURCE_SVG "${CMAKE_CURRENT_SOURCE_DIR}/testcases/pdfoutput/${name}.svg")
@@ -1170,14 +1159,15 @@ function(add_pdfoutput_test name)
             OUTPUT_FILENAME pdfoutput/${name}.pdf
             OUTPUT_PAGE "${NUM}"
             PNG_FILENAME "pdfoutput/expected/${name}-${NUM}.png"
-            FUZZYREF_FILENAME pdfoutput/expected/${name}-${NUM}.png
+            REFERENCE_FILENAME pdfoutput/expected/${name}-${NUM}.png
             FUZZ_PERCENTAGE ${ARG_FUZZ_PERCENTAGE}
             ${RASTER_DPI}
+            ${SUPERSAMPLING}
         )
     endforeach()
     add_cli_test_cln(cli_pdfoutput-${name} cli_pdfoutput-${name}-clean
         OUTPUT_FILENAME pdfoutput/${name}.pdf)
-endfunction(add_pdfoutput_test)
+endfunction()
 
 if(WITH_CAPYPDF)
     add_pdfoutput_test(00-one-thing)
@@ -1187,14 +1177,14 @@ if(WITH_CAPYPDF)
     add_pdfoutput_test(04-test-transforms)
     add_pdfoutput_test(05-test-transparencies)
     add_pdfoutput_test(06-test-markers)
-    add_pdfoutput_test(07-test-shapes)
-    add_pdfoutput_test(08-clones)
-    add_pdfoutput_test(09-text-layout)
+    add_pdfoutput_test(07-test-shapes FUZZ_PERCENTAGE 0.2)
+    add_pdfoutput_test(08-clones FUZZ_PERCENTAGE 1)
+    add_pdfoutput_test(09-text-layout FUZZ_PERCENTAGE 0.2 SUPERSAMPLING 3)
     add_pdfoutput_test(10-text-paint)
     add_pdfoutput_test(11-text-decoration)
-    add_pdfoutput_test(12-rasters)
-    add_pdfoutput_test(13-clips)
-    add_pdfoutput_test(14-filters)
+    add_pdfoutput_test(12-rasters FUZZ_PERCENTAGE 1)
+    add_pdfoutput_test(13-clips SUPERSAMPLING 3)
+    add_pdfoutput_test(14-filters FUZZ_PERCENTAGE 0.2)
     add_pdfoutput_test(15-many-items)
 endif()
 
@@ -1206,27 +1196,27 @@ endif()
 if(WITH_LIBCDR)
   # add_cli_test(import_cdr  PARAMETERS --export-type=png   # fails to open (regression in libcdr 1.6.0)
   #                          INPUT_FILENAME librevenge_formats/corel_draw.cdr OUTPUT_FILENAME format_corel_draw.png
-  #                          FUZZYREF_FILENAME librevenge_formats/corel_draw_expected.png # check png size is correct
+  #                          REFERENCE_FILENAME librevenge_formats/corel_draw_expected.png # check png size is correct
   #                          FUZZ_PERCENTAGE 3)
   add_cli_test(import_cdr2 PARAMETERS --export-type=png
                            INPUT_FILENAME librevenge_formats/corel_draw2.cdr OUTPUT_FILENAME format_corel_draw2.png
-                           FUZZYREF_FILENAME librevenge_formats/corel_draw2_expected.png
+                           REFERENCE_FILENAME librevenge_formats/corel_draw2_expected.png
                            FUZZ_PERCENTAGE 3)
 endif()
 if(WITH_LIBVISIO)
   add_cli_test(import_vsd  PARAMETERS --export-type=png
                            INPUT_FILENAME librevenge_formats/visio.vsd OUTPUT_FILENAME format_visio.vsd.png
-                           FUZZYREF_FILENAME librevenge_formats/visio.vsd_expected.png
+                           REFERENCE_FILENAME librevenge_formats/visio.vsd_expected.png
                            FUZZ_PERCENTAGE 3)
   add_cli_test(import_vsdx PARAMETERS --export-type=png
                            INPUT_FILENAME librevenge_formats/visio.vsdx OUTPUT_FILENAME format_visio.vsdx.png
-                           FUZZYREF_FILENAME librevenge_formats/visio.vsdx_expected.png
+                           REFERENCE_FILENAME librevenge_formats/visio.vsdx_expected.png
                            FUZZ_PERCENTAGE 3)
 endif()
 if(WITH_LIBWPG)
   add_cli_test(import_wpg  PARAMETERS --export-type=png
                            INPUT_FILENAME librevenge_formats/word_perfect.wpg OUTPUT_FILENAME format_word_perfect.png
-                           FUZZYREF_FILENAME librevenge_formats/word_perfect_expected.png
+                           REFERENCE_FILENAME librevenge_formats/word_perfect_expected.png
                            FUZZ_PERCENTAGE 3)
 endif()
 

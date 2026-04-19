@@ -37,7 +37,7 @@ apt_bundle() {
     find *.deb -delete
 }
 
-PY_VER=3.12
+PY_VER=3.14
 apt_bundle \
     libpython${PY_VER}-stdlib \
     libpython${PY_VER}-minimal \

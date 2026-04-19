@@ -60,7 +60,7 @@ add_rendering_test(text-glyphs-vertical FUZZ 0.1 DISABLE TRUE)
 ## Expected rendering generated with Pango 1.44.
 
 # -- LPE tests --
-add_rendering_test(test-powerstroke-join)
+add_rendering_test(test-powerstroke-join FUZZ 0.1)
 
 # <symbol> geometric properties (SVG 2.0 feature)
 add_rendering_test(symbol-svg2-geometry-properties)

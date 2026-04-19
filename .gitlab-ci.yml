@@ -363,7 +363,7 @@ test:linux:
     - *run_otherwise
   needs: ["inkscape:linux"]
   script:
-    - sed -i '/<policy domain="coder" rights="none"/d' /etc/ImageMagick-6/policy.xml
+    - sed -i '/<policy domain="coder" rights="none"/d' /etc/ImageMagick-7/policy.xml
     - cd build
     - ctest -V
   artifacts:

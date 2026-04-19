@@ -18,13 +18,17 @@
      type="text/css"
      id="style1">
     text,
-    text.cjk,
-    text.hebrew {
+    tspan.cjk,
+    text.cjk {
       font-family: Noto Sans;
     }
-    text.arabic,
-    tspan.arabic {
+    tspan.arabic,
+    text.arabic {
       font-family: 'Noto Sans Arabic';
+    }
+    tspan.hebrew,
+    text.hebrew {
+      font-family: 'Noto Sans Hebrew';
     }
 </style>
   <defs
@@ -250,24 +254,16 @@
    style="font-size:15px"
    id="tspan130">Can we do Arabic?</tspan>
 </tspan><tspan
-           x="42.5"
-           y="251.81549"
-           id="tspan132">
-</tspan><tspan
-           x="42.5"
-           y="262.1655"
-           id="tspan134"><tspan
-             style="direction:rtl"
-             id="tspan133">
-</tspan></tspan><tspan
            x="334.86133"
            y="272.51549"
+           class="arabic"
            id="tspan136"><tspan
              dx="0 0 0 0 0 -1.378809 0 0 0 0 0 0 -1.378809 0 0 0 0 0 0 0 -1.378809 0 0 -1.378809 0 0 0 0 0 -1.3787785 0 0 0 0 0 0 -1.3787785 0 0 -1.378809 0 0 -1.378809 0 0 0 0 0 -1.378809 0 -2.6190186 2.618988 0 0 0 -1.378809 0 0 0 0 -1.378809 0 0 -1.378809 0 0 0 0 -1.378809"
              style="direction:rtl"
              id="tspan135">واصل دراسته واكملها في الحرم المكي، ثم في جامعة الإمام محمد بن سعود في </tspan></tspan><tspan
            x="164.02188"
            y="282.86549"
+           class="arabic"
            id="tspan142"><tspan
              style="direction:rtl"
              id="tspan137">المملكة </tspan><tspan
@@ -284,6 +280,7 @@
              id="tspan141">وعلوم الآلة، وتعمق في أصول </tspan></tspan><tspan
            x="157.08139"
            y="293.2155"
+           class="arabic"
            id="tspan149"><tspan
              style="direction:rtl"
              id="tspan143">الدين </tspan><tspan
@@ -303,6 +300,7 @@
              id="tspan148">العلمية </tspan></tspan><tspan
            x="154.76915"
            y="303.56551"
+           class="arabic"
            id="tspan156"><tspan
              style="direction:rtl"
              id="tspan150">أستاذًا </tspan><tspan
@@ -323,6 +321,7 @@
              id="tspan155">حيث </tspan></tspan><tspan
            x="154.76917"
            y="313.91551"
+           class="arabic"
            id="tspan200"><tspan
              dx="0 0 0 0 -2.0325336 0 -4.6620026 4.6619987 -2.0325336"
              style="direction:rtl"
@@ -344,6 +343,7 @@
              id="tspan199"> </tspan></tspan><tspan
            x="111.52233"
            y="324.26552"
+           class="arabic"
            id="tspan210"><tspan
              dx="0 0 0 0 0 0 -8.6001606"
              style="direction:rtl"
@@ -370,6 +370,7 @@
              id="tspan209">سجلها </tspan></tspan><tspan
            x="163.37578"
            y="334.61552"
+           class="arabic"
            id="tspan217"><tspan
              style="direction:rtl"
              id="tspan211">له </tspan><tspan
@@ -389,6 +390,7 @@
              id="tspan216">الرسمي </tspan></tspan><tspan
            x="331.94003"
            y="344.96553"
+           class="arabic"
            id="tspan224"><tspan
    style="direction:rtl"
    id="tspan218">في الثقافة </tspan><tspan
@@ -404,10 +406,6 @@
    dx="279.32405"
    style="direction:rtl"
    id="tspan223">.</tspan>
-</tspan><tspan
-           x="42.5"
-           y="355.31554"
-           id="tspan225">
 </tspan></text>
       <circle
          style="shape-margin:12.4022;fill:#000000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
@@ -420,7 +418,7 @@
          style="shape-margin:5;fill:#000000;fill-opacity:1;stroke-width:1.10885;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
          id="circle11"
          cx="709.21136"
-         cy="77.645622"
+         cy="74.47062"
          r="6.8565106"
          inkscape:label="Excluded Shape 2" />
     </g>
@@ -625,18 +623,6 @@
          y="36.978909"
          style="font-size:10.5833px;line-height:0.5;fill:#000000;stroke-width:2.127"
          id="tspan13">one half</tspan></text>
-    <text
-       class="hebrew"
-       xml:space="preserve"
-       style="font-size:13.587px;line-height:1;text-align:start;text-decoration-color:#000000;letter-spacing:0px;direction:rtl;text-anchor:start;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
-       x="530.60345"
-       y="34.494831"
-       id="text24-2"><tspan
-         sodipodi:role="line"
-         id="tspan24-6"
-         x="530.60345"
-         y="34.494831"
-         style="direction:rtl;fill:#000000;stroke:none;stroke-width:2">מילים נסתרות</tspan></text>
     <g
        id="g346"
        inkscape:label="Up and Down Text">

@@ -48,15 +48,7 @@ protected:
         // setup hidden dependency
         Application::create(false);
         Inkscape::Extension::init();
-        const testing::TestInfo* const test_info =
-        testing::UnitTest::GetInstance()->current_test_info();
-        svg = test_info->file();
-#ifdef INKSCAPE_TESTS_DIR
         svg = INKSCAPE_TESTS_DIR;
-#else
-        size_t pos = svg.find("lpespaths-test.h");
-        svg.erase(pos);
-#endif
         svg += "/store_integrity_tests/store.svg"; // gitlab use this separator
     }
 
@@ -64,38 +56,26 @@ protected:
     // root svg from global and override with per shape "inkscape:test-threshold"
     void testDoc(std::string file, StoreIntegrityMode mode) 
     {
-        std::unique_ptr<SPDocument> doc{SPDocument::createNewDoc(file.c_str())};
-        ASSERT_TRUE(doc != nullptr);
+        auto doc = SPDocument::createNewDoc(file.c_str());
+        ASSERT_TRUE(doc);
         doc->ensureUpToDate();
         SPLPEItem *lpeitem = doc->getRoot();
         if (mode == StoreIntegrityMode::UPDATE_ORIGINAL || mode == StoreIntegrityMode::UPDATE_BOTH) {
             lpeitem->updateRepr(SP_OBJECT_CHILD_MODIFIED_FLAG);
         }
         Inkscape::XML::Document * xmldoc = doc->getReprDoc();
-        std::string svg_out = file + ".out.svg";
+        std::string svg_out = "store_integrity_test_tmp.svg";
         // Try to save the file
         // Following code needs to be reviewed
         
         FILE *filesave = Inkscape::IO::fopen_utf8name(svg_out.c_str(), "w");
-        Glib::ustring errortext;
-        if (filesave) {
-            try {
-                sp_repr_save_stream(xmldoc, filesave, SP_SVG_NS_URI);
-            } catch (Inkscape::Extension::Output::no_extension_found &e) {
-                errortext = "failed! Could not find inkscape extension to save document.";
-            } catch (Inkscape::Extension::Output::save_failed &e) {
-                auto const safeUri = Inkscape::IO::sanitizeString(svg_out.c_str());
-                errortext = "failed! File " + safeUri + " could not be saved.";
-            }
-            fclose(filesave);
-        } else {
-            auto const safeUri = Inkscape::IO::sanitizeString(svg_out.c_str());
-            errortext = "failed! File " + safeUri + " could not be saved.";
+        if (!filesave) {
+            FAIL() << "File " << svg_out << " could not be saved.";
         }
-        if (!errortext.empty()) {
-            g_warning("%s", errortext.c_str());
-        }
-        std::unique_ptr<SPDocument> doc_out{SPDocument::createNewDoc(svg_out.c_str())};
+        sp_repr_save_stream(xmldoc, filesave, SP_SVG_NS_URI);
+        fclose(filesave);
+        auto doc_out = SPDocument::createNewDoc(svg_out.c_str());
+        ASSERT_TRUE(doc_out);
         doc_out->ensureUpToDate();
         if (mode == StoreIntegrityMode::UPDATE_SAVED || mode == StoreIntegrityMode::UPDATE_BOTH) {
             doc_out->getRoot()->updateRepr(SP_OBJECT_CHILD_MODIFIED_FLAG);
