@@ -160,7 +160,7 @@
       <path
          transform="scale(0.7)"
          d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
-         style="fill:context-stroke;fill-rule:evenodd;stroke:none" />
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.5" />
     </marker>
     <marker
        style="overflow:visible"
