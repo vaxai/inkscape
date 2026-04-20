@@ -204,6 +204,10 @@ Application::Application(bool use_gui) :
             bool enabled = prefs->getBool("/theme/enableAnimations", false);
             Gtk::Settings::get_default()->property_gtk_enable_animations().set_value(enabled);
         }
+
+        /* set PangoCairo rendering backend to FontConfig. See issue #6117 */
+        Glib::setenv("PANGOCAIRO_BACKEND", "fontconfig", true);
+
     }
 
     /* Initialize font factory */
