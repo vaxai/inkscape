@@ -21,6 +21,7 @@
 #include <2geom/transforms.h>
 
 #include <glibmm/ustring.h>
+#include <pangomm/layout.h>
 #include <pangomm/rectangle.h>
 
 #include "canvas-item.h"
@@ -50,11 +51,10 @@ public:
     void set_background(uint32_t background);
     void set_anchor(Geom::Point const &anchor_pt);
     void set_adjust(Geom::Point const &adjust_pt);
-    void set_fixed_line(bool fixed_line);
 
     // Property getters
 
-    Geom::Rect get_text_size() const;
+    Geom::Rect get_text_size();
 
 protected:
     ~CanvasItemText() override = default;
@@ -63,6 +63,7 @@ protected:
     void _render(Inkscape::CanvasItemBuffer &buf) const override;
 
     Geom::Point _p;  // Position of text (not box around text).
+    Glib::RefPtr<Pango::Layout> _layout;
     Pango::Rectangle _text_extents;
     Geom::Point _anchor_position;
     Geom::Point _adjust_offset;
@@ -70,14 +71,13 @@ protected:
     Glib::ustring _text;
     std::string _fontname = "sans-serif";
     double _fontsize = 10;
-    double _fontsize_pt = 7.5;
     double _border = 3;
     double _bg_rad = 0;
     uint32_t _background = 0x0000007f;
     bool _use_background = true;
     bool _scaled = false;
 
-    Geom::Rect load_text_extents();
+    Geom::Rect draw_text_and_return_extents();
 };
 
 } // namespace Inkscape

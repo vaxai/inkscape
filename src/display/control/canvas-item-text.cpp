@@ -16,6 +16,7 @@
 
 #include "canvas-item-text.h"
 
+#include <pango/pango-types.h>
 #include <pangomm/fontdescription.h>
 #include <pangomm/layout.h>
 #include <pangomm/rectangle.h>
@@ -24,7 +25,6 @@
 
 #include "display/cairo-utils.h"
 #include "ui/util.h"
-#include "util/units.h"
 
 namespace Inkscape {
 
@@ -97,17 +97,14 @@ void CanvasItemText::_update(bool)
     Geom::Point p = _scaled ? _p : _p * affine();
 
     // Measure text size
-    _text_box = load_text_extents();
+    _text_box = draw_text_and_return_extents();
 
     // Offset relative to requested point
     double offset_x = -(_anchor_position.x() * _text_box.width());
     double offset_y = -(_anchor_position.y() * _text_box.height());
     offset_x += p.x() + _adjust_offset.x();
     offset_y += p.y() + _adjust_offset.y();
-    _text_box *= Geom::Translate(Geom::Point(offset_x, offset_y).floor());
-
-    // Pixel alignment of background. Avoid aliasing artifacts on redraw.
-    _text_box = _text_box.roundOutwards();
+    _text_box *= Geom::Translate(Geom::Point(offset_x, offset_y));
 
     // Don't apply affine here, to keep text at the same size in screen coords.
     _bounds = _text_box;
@@ -135,6 +132,7 @@ void CanvasItemText::_render(Inkscape::CanvasItemBuffer &buf) const
         buf.cr->transform(geom_to_cairo(affine()));
     }
 
+    // Recalculate extents to make in sync
     double x = _text_box.min().x();
     double y = _text_box.min().y();
     double w = _text_box.width();
@@ -156,21 +154,12 @@ void CanvasItemText::_render(Inkscape::CanvasItemBuffer &buf) const
         buf.cr->fill();
     }
 
-    // Center the text inside the draw background box
-    // To truly center text: offset
-    // descent (A top to j bottom) minus font size (A top to baseline)
-    auto bx = x + w / 2.0;
-    auto by = y + h / 2.0;
-    buf.cr->move_to(int(bx - _text_extents.get_width()/2.0),
-                    int(by - _border - (_text_extents.get_descent() - _fontsize)));
+    buf.cr->move_to(x + _border, y + _border);
 
-    // Call Pango to draw text with fallback fonts
-    auto layout = Pango::Layout::create(buf.cr);
-    auto desc_str = Glib::ustring::compose("%1 %2", _fontname, _fontsize_pt);
-    layout->set_font_description(Pango::FontDescription(desc_str));
-    layout->set_text(_text);
     buf.cr->set_source_rgb(1.0, 1.0, 1.0); // Explicitly set color
-    layout->show_in_cairo_context(buf.cr);
+    // Show computed layout in buffer; otherwise if we compute on the fly,
+    // the extents may be different than the existing one
+    _layout->add_to_cairo_context(buf.cr);
 
     ink_cairo_set_source_color(buf.cr, Colors::Color(_fill));
     buf.cr->fill();
@@ -193,41 +182,41 @@ void CanvasItemText::set_text(Glib::ustring text)
  */
 void CanvasItemText::set_fontsize(double fontsize)
 {
-    // Historically we assume that the passed in value is px.
-    // However, Pango uses pt for its font size unit, so we convert it here.
     defer([=, this] {
-        double fontsize_pt = Util::Quantity::convert(fontsize, "px", "pt");
-        if (_fontsize_pt == fontsize_pt) return;
-        _fontsize_pt = fontsize_pt;
+        if (_fontsize == fontsize) return;
         _fontsize = fontsize;
         request_update(); // Might be larger than before!
     });
 }
 
-Geom::Rect CanvasItemText::get_text_size() const {
-    return Geom::Rect::from_xywh(0, 0,
-                                 _text_extents.get_width() + _border * 2,
-                                 _fontsize + _border * 2);
+Geom::Rect CanvasItemText::get_text_size() {
+    auto text_box = draw_text_and_return_extents();
+    return text_box;
 }
 
 /**
  * Load the sizes of the text extent using the given font.
  */
-Geom::Rect CanvasItemText::load_text_extents()
+Geom::Rect CanvasItemText::draw_text_and_return_extents()
 {
     auto surface = Cairo::ImageSurface::create(Cairo::Surface::Format::ARGB32, 1, 1);
     auto context = Cairo::Context::create(surface);
 
-    // Call Pango to draw text with fallback fonts
-    auto layout = Pango::Layout::create(context);
-    auto desc_str = Glib::ustring::compose("%1 %2", _fontname, _fontsize_pt);
-    layout->set_font_description(Pango::FontDescription(desc_str));
-    layout->set_text(_text);
-    _text_extents = layout->get_pixel_logical_extents();
+    // Call Pango to draw text with fallback fonts.
+    // This is the sole source of truth for the text layout.
+    _layout = Pango::Layout::create(context);
+
+    // Set Pango font description
+    auto fontdesc = Pango::FontDescription(_fontname);
+    fontdesc.set_absolute_size(_fontsize * PANGO_SCALE);
+
+    _layout->set_font_description(fontdesc);
+    _layout->set_text(_text);
+    _text_extents = _layout->get_pixel_logical_extents();
 
     return Geom::Rect::from_xywh(0, 0,
                                  _text_extents.get_width() + _border * 2,
-                                 _fontsize + _border * 2);
+                                 _text_extents.get_height() + _border * 2);
 }
 
 void CanvasItemText::set_background(uint32_t background)

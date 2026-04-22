@@ -1419,8 +1419,11 @@ void MeasureTool::showInfoBox(Geom::Point cursor, bool into_groups)
         auto measurement = [precision, unit_name](std::string const &label, double num) {
             return ustring::format_classic(label, ": ", Util::format_number(num, precision), unit_name);
         };
-        auto add_label = [this, &rel_position, pos, zoom, fontsize, gap](std::string const &label) {
+        auto add_label = [this, &rel_position, pos, zoom, fontsize, gap, unit](std::string const &label) mutable {
             addCanvasItemText(measure_item, pos - (_desktop->yaxisdir() * Geom::Point(0, rel_position[Geom::Y]) * zoom), label, fontsize);
+            if (auto last_text = dynamic_cast<CanvasItemText *>(measure_item.back().get())) {
+                gap = Quantity::convert(last_text->get_text_size().height() + 1, "px", unit->abbr);
+            }
             rel_position = Geom::Point(rel_position[Geom::X], rel_position[Geom::Y] + gap);
         };
 
