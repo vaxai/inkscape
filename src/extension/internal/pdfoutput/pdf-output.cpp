@@ -138,7 +138,7 @@ void PdfOutput::init()
             "<name>Portable Document Format</name>\n"
             "<id>org.inkscape.output.pdf.capypdf</id>\n"
             "<param name=\"PDFversion\" gui-text=\"" N_("Restrict to PDF version:") "\" type=\"optiongroup\" appearance=\"combo\" >\n"
-                "<option value='PDF-1.7'>" N_("PDF 1.7") "</option>\n"
+                "<option value='PDF-2.0'>" N_("PDF 2.0") "</option>\n"
                 // No other value is supported at the moment
             "</param>\n"
             "<param name=\"textToPath\" gui-text=\"" N_("Text output options:") "\" type=\"optiongroup\" appearance=\"radio\">\n"
