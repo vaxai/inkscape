@@ -468,7 +468,7 @@ void Extension::lookup_translation_catalog() {
     // register catalog with gettext if found, disable translation for this extension otherwise
     if (!_gettext_catalog_dir.empty()) {
         char const *current_dir = bindtextdomain(_translationdomain, nullptr);
-        if (_gettext_catalog_dir != current_dir) {
+        if (!current_dir || _gettext_catalog_dir != current_dir) {
             g_info("Binding textdomain '%s' to '%s'.", _translationdomain, _gettext_catalog_dir.c_str());
             bindtextdomain(_translationdomain, _gettext_catalog_dir.c_str());
             bind_textdomain_codeset(_translationdomain, "UTF-8");
