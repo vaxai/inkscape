@@ -1138,6 +1138,7 @@ if(WITH_POPPLER)
     add_pdfinput_test(Annot_w_AP_CMYK all draw-all IN_FILE "Annot_w_AP")
     add_pdfinput_test(clipping_shift 1 keep)
     add_pdfinput_test(layers-in-xobj 1 substitute EXTRA "--pdf-group-by=layer")
+    add_pdfinput_test(negative-font-size 1 draw-all)
 endif()
 
 function(add_pdfoutput_test name)

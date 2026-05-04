@@ -1360,12 +1360,13 @@ void SvgBuilder::updateStyle(GfxState *state) {
 void SvgBuilder::updateFont(GfxState *state, std::shared_ptr<CairoFont> cairo_font, bool flip)
 {
     TRACE(("updateFont()\n"));
-    updateTextMatrix(state, flip);    // Ensure that we have a text matrix built
+    // If the font size is negative, don't flip
+    auto new_font_size = state->getFontSize();
+    updateTextMatrix(state, flip && new_font_size > 0);    // Ensure that we have a text matrix built
 
     auto font = state->getFont();  // GfxFont
     auto font_id = font->getID()->num;
 
-    auto new_font_size = state->getFontSize();
     if (font->getType() == fontType3) {
         const auto& font_matrix = font->getFontMatrix();
         if (font_matrix[0] != 0.0) {
@@ -1373,7 +1374,7 @@ void SvgBuilder::updateFont(GfxState *state, std::shared_ptr<CairoFont> cairo_fo
         }
     }
     if (new_font_size != _css_font_size) {
-        _css_font_size = new_font_size;
+        _css_font_size = fabs(new_font_size);
         _invalidated_style = true;
     }
 
