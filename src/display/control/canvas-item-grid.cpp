@@ -18,6 +18,7 @@
 
 #include "colors/color.h"
 #include "helper/geom.h"
+#include "helper/mathfns.h"
 
 enum Dim3
 {
@@ -333,15 +334,17 @@ void CanvasItemGridXY::_render(Inkscape::CanvasItemBuffer &buf) const
 /** ========= Axonometric Grids ======== */
 
 /*
- * Current limits are: one axis (y-axis) is always vertical. The other two
- * axes are bound to a certain range of angles. The z-axis always has an angle
- * smaller than 90 degrees (measured from horizontal, 0 degrees being a line extending
- * to the right). The x-axis will always have an angle between 0 and 90 degrees.
+ * Current limits are: one axis (y-axis) is always either vertical or calculated from
+ * the other two axes to form an intersection with the generated grid. The other two
+ * axes are bound to a certain range of angles. The z-axis always has an angle smaller
+ * than 90 degrees (measured from horizontal, 0 degrees being a line extending to the
+ * right). The x-axis will always have an angle between 0 and 90 degrees.
  */
 CanvasItemGridAxonom::CanvasItemGridAxonom(Inkscape::CanvasItemGroup *group)
     : CanvasItemGrid(group)
 {
     _name = "CanvasItemGridAxonom";
+    angle_y_vertical = true;
 
     angle_deg[X] = 30.0;
     angle_deg[Y] = 30.0;
@@ -361,18 +364,26 @@ void CanvasItemGridAxonom::_update(bool)
     double tan_x = std::tan(angle_rad[X]);
     double tan_z = std::tan(angle_rad[Z]);
 
-    double len_y = _spacing.y();
-    double len_x = len_y * std::cos(angle_rad[X]);
-    double len_z = len_y * std::cos(angle_rad[Z]);
+    double len = _spacing.y();
+    double len_x = len * std::cos(angle_rad[X]);
+    double len_z = len * std::cos(angle_rad[Z]);
 
-    direction[Y] = Geom::Point(0, 1);
     direction[X] = Geom::Point(1.0, tan_x);
     direction[Z] = Geom::Point(1.0, -tan_z);
-    normal[Y] = Geom::Point(len_y / (tan_x + tan_z), 0);
     normal[X] = rot90(direction[X]).normalized() * len_x;
     normal[Z] = rot90(direction[Z]).normalized() * len_z;
 
-    auto scaled_y = len_y * affine().descrim();
+    if (angle_y_vertical) {
+        direction[Y] = Geom::Point(0, 1);
+        normal[Y] = Geom::Point(len / (tan_x + tan_z), 0);
+    } else {
+        double len_y = len * std::cos(angle_rad[Y]);
+        double tan_y = std::tan(angle_rad[Y]);
+        direction[Y] = Geom::Point(1.0, tan_y);
+        normal[Y] = rot90(direction[Y]).normalized() * len_y * 0.5;
+    }
+
+    auto scaled_y = len * affine().descrim();
     int const scaling_factor = calculate_scaling_factor(scaled_y, _major_line_interval);
     scaled = scaling_factor > 1;
 
@@ -389,13 +400,35 @@ void CanvasItemGridAxonom::_update(bool)
     request_redraw();
 }
 
+// Shared update function for when angles change, to recalculate the derived Y angle if necessary and queue redraw.
+void CanvasItemGridAxonom::update_derived_angle_y()
+{
+    if (!angle_y_vertical) {
+        angle_rad[Y] = Util::derived_angle_y(angle_rad[X], angle_rad[Z]);
+        angle_deg[Y] = Geom::deg_from_rad(angle_rad[Y]);
+    }
+    request_update();
+}
+
+void CanvasItemGridAxonom::set_angle_y_vertical(bool vertical)
+{
+    defer([=, this] {
+        if (angle_y_vertical == vertical) {
+            return;
+        }
+
+        angle_y_vertical = vertical;
+        update_derived_angle_y();
+    });
+}
+
 // expects value given to be in degrees
 void CanvasItemGridAxonom::set_angle_x(double deg)
 {
     defer([=, this] {
         angle_deg[X] = std::clamp(deg, 0.0, 89.0); // setting to 90 and values close cause extreme slowdowns
         angle_rad[X] = Geom::rad_from_deg(angle_deg[X]);
-        request_update();
+        update_derived_angle_y();
     });
 }
 
@@ -405,7 +438,7 @@ void CanvasItemGridAxonom::set_angle_z(double deg)
     defer([=, this] {
         angle_deg[Z] = std::clamp(deg, 0.0, 89.0); // setting to 90 and values close cause extreme slowdowns
         angle_rad[Z] = Geom::rad_from_deg(angle_deg[Z]);
-        request_update();
+        update_derived_angle_y();
     });
 }
 

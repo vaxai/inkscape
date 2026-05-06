@@ -93,6 +93,7 @@ private:
     RegisteredScalarUnit *_spacing_y = nullptr;
     RegisteredScalar *_angle_x = nullptr;
     RegisteredScalar *_angle_z = nullptr;
+    RegisteredCheckButton *_angle_y_vertical = nullptr;
     RegisteredColorPicker *_grid_color = nullptr;
     RegisteredInteger *_no_of_lines = nullptr;
     RegisteredScalarUnit* _gap_x = nullptr;
@@ -100,6 +101,7 @@ private:
     RegisteredScalarUnit* _margin_x = nullptr;
     RegisteredScalarUnit* _margin_y = nullptr;
     Gtk::MenuButton* _angle_popup = Gtk::make_managed<Gtk::MenuButton>();
+    Gtk::Button* _swap_axes = Gtk::make_managed<Gtk::Button>();
     Gtk::Entry* _aspect_ratio = nullptr;
 
     sigc::scoped_connection _modified_signal;
@@ -1804,6 +1806,9 @@ GridWidget::GridWidget(SPGrid *grid)
         _("An_gle of X:"), _("Angle of x-axis relative to horizontal direction"), "gridanglex", _wr, repr, doc);
     _angle_z = Gtk::make_managed<RegisteredScalar>(
         _("Ang_le of Z:"), _("Angle of z-axis relative to horizontal direction"), "gridanglez", _wr, repr, doc);
+    _angle_y_vertical = Gtk::make_managed<RegisteredCheckButton>("Angle Y vertical",
+            _("If set, y-axis will be vertical. Otherwise, it will be calculated from x and z angles."),
+            "angleyvertical", _wr, false, repr, doc);
     _grid_color = Gtk::make_managed<RegisteredColorPicker>(
                 "", _("Grid color"),
                 _("Color of the grid lines"),
@@ -1827,6 +1832,7 @@ GridWidget::GridWidget(SPGrid *grid)
     _units->set_undo_parameters(RC_("Undo", "Change grid units"), "show-grid", "grid-settings");
     _angle_x->set_undo_parameters(RC_("Undo", "Change grid dimensions"), "show-grid", "grid-settings");
     _angle_z->set_undo_parameters(RC_("Undo", "Change grid dimensions"), "show-grid", "grid-settings");
+    _angle_y_vertical->set_undo_parameters(RC_("Undo", "Change grid dimensions"), "show-grid", "grid-settings");
     _grid_color->set_undo_parameters(RC_("Undo", "Change grid color"), "show-grid", "grid-settings");
     _no_of_lines->set_undo_parameters(RC_("Undo", "Change grid number of lines"), "show-grid", "grid-settings");
     for (auto widget : {_origin_x, _origin_y, _spacing_x, _spacing_y, _gap_x, _gap_y, _margin_x, _margin_y}) {
@@ -1842,8 +1848,31 @@ GridWidget::GridWidget(SPGrid *grid)
     _units->set_hexpand();
     _angle_x->set_hexpand();
     _angle_z->set_hexpand();
+    _angle_y_vertical->set_hexpand();
     _no_of_lines->set_hexpand();
     _no_of_lines->setWidthChars(5);
+
+    _swap_axes->set_label(_("Swap axes"));
+    _swap_axes->set_tooltip_text(_("Swap axonometric grid axes"));
+    _swap_axes->signal_clicked().connect([this](){
+        auto cur_angle_x = _grid->getAngleX();
+        auto cur_angle_z = _grid->getAngleZ();
+        auto new_angle_x = 90 - cur_angle_x;
+        auto new_angle_z = 90 - cur_angle_z;
+        auto y_vertical = _grid->isAngleYVertical();
+        auto y_spacing = _grid->getSpacing()[Geom::Y];
+
+        auto rad_x = Geom::rad_from_deg(new_angle_x);
+        auto rad_z = Geom::rad_from_deg(new_angle_z);
+
+        auto b = y_spacing * sin(rad_x) / sin(rad_x + rad_z);
+        auto diag_size = 2.0 * sqrt(y_spacing * y_spacing / 4.0 + b * b - y_spacing * b * cos(rad_z));
+
+        _grid->setAngleYVertical(!y_vertical);
+        _grid->setAngleX(new_angle_x);
+        _grid->setAngleZ(new_angle_z);
+        _grid->setSpacing(Geom::Point(diag_size, diag_size));
+    });
 
     _origin_x->setProgrammatically = false;
     _origin_y->setProgrammatically = false;
@@ -1948,7 +1977,7 @@ GridWidget::GridWidget(SPGrid *grid)
             _align->set_halign(Gtk::Align::END);
         }
         if (rs == _angle_x) {
-            cur_grid->attach(*_angle_popup, 1, row, 1, 2);
+            cur_grid->attach(*_angle_popup, 1, row, 1, 3);
         }
         if (rs == _angle_x || rs == _angle_z) {
             rs->setWidthChars(8);
@@ -1957,7 +1986,9 @@ GridWidget::GridWidget(SPGrid *grid)
         cur_grid->attach(*rs, 0, row++, width);
     }
 
-    left_col->attach(*_no_of_lines, 0, row++, 2);
+    left_col->attach(*_angle_y_vertical, 0, row++, 2);
+    left_col->attach(*_swap_axes, 0, row++, 2);
+    right_col->attach(*_no_of_lines, 0, row++, 2);
 
     _modified_signal = grid->connectModified([this, grid](SPObject const * /*obj*/, unsigned /*flags*/) {
         if (!_wr.isUpdating()) {
@@ -2037,10 +2068,13 @@ void GridWidget::update()
 
     show(_angle_x, axonometric);
     show(_angle_z, axonometric);
+    show(_angle_y_vertical, axonometric);
     show(_angle_popup, axonometric);
+    show(_swap_axes, axonometric);
     if (axonometric) {
         _angle_x->setValue(_grid->getAngleX());
         _angle_z->setValue(_grid->getAngleZ());
+        _angle_y_vertical->set_active(_grid->isAngleYVertical());
     }
 
     show(_gap_x, modular);

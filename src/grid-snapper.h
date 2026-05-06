@@ -43,6 +43,6 @@ private:
     LineList get_snap_lines(const Geom::Point& p, int limit) const;
 };
 
-} // namepsace Inkscape
+} // namespace Inkscape
 
 #endif // SEEN_GRID_SNAPPER_H_

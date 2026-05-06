@@ -91,6 +91,9 @@ public:
     double getAngleZ() const { return _angle_z.computed; }
     void setAngleZ(double deg);
 
+    bool isAngleYVertical() const { return _angle_y_vertical; }
+    void setAngleYVertical(bool vertical);
+
     Geom::Point get_gap() const { return Geom::Point(_gap_x.computed, _gap_y.computed); }
     Geom::Point get_margin() const { return Geom::Point(_margin_x.computed, _margin_y.computed); }
 
@@ -138,6 +141,7 @@ private:
     SVGLength _spacing_y;
     SVGAngle _angle_x; // only for axonomgrid, stored in degrees
     SVGAngle _angle_z; // only for axonomgrid, stored in degrees
+    SVGBool _angle_y_vertical; // only for axonomgrid, whether y axis is vertical (isometric) or derived from x and z angles
     SVGLength _gap_x; // only for modular grid
     SVGLength _gap_y;
     SVGLength _margin_x; // only for modular grid

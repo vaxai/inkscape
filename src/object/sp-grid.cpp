@@ -48,6 +48,7 @@ SPGrid::SPGrid()
     , _dotted(false)
     , _snap_to_visible_only(true)
     , _legacy(false)
+    , _angle_y_vertical(true)
     , _major_color{GRID_DEFAULT_MAJOR_COLOR}
     , _minor_color{GRID_DEFAULT_MINOR_COLOR}
     , _pixel(true)
@@ -92,6 +93,7 @@ void SPGrid::build(SPDocument *doc, Inkscape::XML::Node *repr)
     readAttr(SPAttr::SPACINGY);
     readAttr(SPAttr::ANGLE_X);
     readAttr(SPAttr::ANGLE_Z);
+    readAttr(SPAttr::ANGLE_Y_VERTICAL);
     readAttr(SPAttr::GAP_X);
     readAttr(SPAttr::GAP_Y);
     readAttr(SPAttr::MARGIN_X);
@@ -184,6 +186,10 @@ void SPGrid::set(SPAttr key, const gchar* value)
             break;
         case SPAttr::ANGLE_Z: // only meaningful for axonomgrid
             _angle_z.read(value);
+            requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
+            break;
+        case SPAttr::ANGLE_Y_VERTICAL: // only meaningful for axonomgrid
+            _angle_y_vertical.read(value);
             requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
             break;
         case SPAttr::GAP_X: // only meaningful for modular
@@ -412,6 +418,7 @@ void SPGrid::setPrefValues()
         setDotted(prefs->getBool("/options/grids/xy/dotted"));
         setAngleX(prefs->getDouble("/options/grids/axonom/angle_x"));
         setAngleZ(prefs->getDouble("/options/grids/axonom/angle_z"));
+        setAngleYVertical(prefs->getBool("/options/grids/axonom/angle_y_vertical"));
     }
 
     // modular grid properties
@@ -480,6 +487,7 @@ void SPGrid::update(SPCtx *ctx, unsigned int flags)
             if (auto axonom = dynamic_cast<Inkscape::CanvasItemGridAxonom *>(view.get())) {
                 axonom->set_angle_x(_angle_x.computed);
                 axonom->set_angle_z(_angle_z.computed);
+                axonom->set_angle_y_vertical(_angle_y_vertical);
             }
 
             if (auto modular = dynamic_cast<Inkscape::CanvasItemGridTiles*>(view.get())) {
@@ -742,6 +750,13 @@ void SPGrid::setAngleX(double deg)
 void SPGrid::setAngleZ(double deg)
 {
     getRepr()->setAttributeSvgDouble("gridanglez", deg);
+
+    requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
+}
+
+void SPGrid::setAngleYVertical(bool vertical)
+{
+    getRepr()->setAttributeBoolean("angleyvertical", vertical);
 
     requestDisplayUpdate(SP_OBJECT_MODIFIED_FLAG);
 }

@@ -11,11 +11,13 @@
  */
 #include "grid-snapper.h"
 
+#include <cmath>
+
 #include "desktop.h"
-#include "preferences.h"
 #include "helper/mathfns.h"
 #include "object/sp-grid.h"
 #include "object/sp-namedview.h"
+#include "preferences.h"
 
 static int calculate_scaling_factor(double length, int major)
 {
@@ -145,8 +147,16 @@ LineSnapper::LineList GridSnapper::getSnapLinesAxonom(Geom::Point const &p) cons
     auto const *desktop = _snapmanager->getDesktop();
     auto const [origin, spacing] = _grid->getEffectiveOriginAndSpacing();
 
+    bool is_y_vertical = _grid->isAngleYVertical();
+
+    double angle_y_rad = Util::derived_angle_y(
+            Geom::rad_from_deg(_grid->getAngleX()),
+            Geom::rad_from_deg(_grid->getAngleZ())
+        );
+
     double ta_x = tan(Geom::rad_from_deg(_grid->getAngleX()));
     double ta_z = tan(Geom::rad_from_deg(_grid->getAngleZ()));
+    double ta_y = tan(angle_y_rad);
 
     if (desktop && desktop->yaxisdown()) {
         std::swap(ta_x, ta_z);
@@ -164,7 +174,9 @@ LineSnapper::LineList GridSnapper::getSnapLinesAxonom(Geom::Point const &p) cons
     }
 
     // In an axonometric grid, any point will be surrounded by 6 grid lines:
-    // - 2 vertical grid lines, one left and one right from the point
+    // - y axis:
+    //   - if vertical: 2 vertical grid lines, one left and one right from the point
+    //   - else: 2 angled y grid lines, one above and one below the point
     // - 2 angled z grid lines, one above and one below the point
     // - 2 angled x grid lines, one above and one below the point
 
@@ -173,20 +185,25 @@ LineSnapper::LineList GridSnapper::getSnapLinesAxonom(Geom::Point const &p) cons
     Geom::Coord x_min = Util::round_to_lower_multiple_plus(p[Geom::X], spacing_h, origin[Geom::X]);
 
     // Calculate the y coordinate of the intersection of the angled grid lines with the y-axis
-    double y_proj_along_z = p[Geom::Y] - ta_z * (p[Geom::X] - origin[Geom::X]);
     double y_proj_along_x = p[Geom::Y] + ta_x * (p[Geom::X] - origin[Geom::X]);
-    double y_proj_along_z_max = Util::round_to_upper_multiple_plus(y_proj_along_z, spacing_v, origin[Geom::Y]);
-    double y_proj_along_z_min = Util::round_to_lower_multiple_plus(y_proj_along_z, spacing_v, origin[Geom::Y]);
+    double y_proj_along_z = p[Geom::Y] - ta_z * (p[Geom::X] - origin[Geom::X]);
+    double y_proj_along_y = p[Geom::Y] - ta_y * (p[Geom::X] - origin[Geom::X]);
     double y_proj_along_x_max = Util::round_to_upper_multiple_plus(y_proj_along_x, spacing_v, origin[Geom::Y]);
     double y_proj_along_x_min = Util::round_to_lower_multiple_plus(y_proj_along_x, spacing_v, origin[Geom::Y]);
+    double y_proj_along_z_max = Util::round_to_upper_multiple_plus(y_proj_along_z, spacing_v, origin[Geom::Y]);
+    double y_proj_along_z_min = Util::round_to_lower_multiple_plus(y_proj_along_z, spacing_v, origin[Geom::Y]);
+    double y_proj_along_y_max = Util::round_to_upper_multiple_plus(y_proj_along_y, spacing_v * 0.5, origin[Geom::Y]);
+    double y_proj_along_y_min = Util::round_to_lower_multiple_plus(y_proj_along_y, spacing_v * 0.5, origin[Geom::Y]);
 
     // Calculate the versor for the angled grid lines
     Geom::Point vers_x = Geom::Point(1, -ta_x);
     Geom::Point vers_z = Geom::Point(1, ta_z);
+    Geom::Point vers_y = Geom::Point(1, ta_y);
 
     // Calculate the normal for the angled grid lines
     Geom::Point norm_x = Geom::rot90(vers_x);
     Geom::Point norm_z = Geom::rot90(vers_z);
+    Geom::Point norm_y = Geom::rot90(vers_y);
 
     // The four angled grid lines form a parallelogram, enclosing the point
     // One of the two vertical grid lines divides this parallelogram in two triangles
@@ -199,6 +216,8 @@ LineSnapper::LineList GridSnapper::getSnapLinesAxonom(Geom::Point const &p) cons
     Geom::Line line_x(p_x, p_x + vers_x);
     Geom::Point p_z(0, y_proj_along_z_max);
     Geom::Line line_z(p_z, p_z + vers_z);
+    Geom::Point p_y(0, y_proj_along_y_max);
+    Geom::Line line_y(p_y, p_y + vers_y);
 
     Geom::OptCrossing inters = Geom::OptCrossing(); // empty by default
     try
@@ -224,18 +243,27 @@ LineSnapper::LineList GridSnapper::getSnapLinesAxonom(Geom::Point const &p) cons
     // Return the three grid lines which define the triangle that encloses our point
     // If we didn't find an intersection above, all 6 grid lines will be returned
     if (use_left_half) {
-        s.emplace_back(norm_z, Geom::Point(origin[Geom::X], y_proj_along_z_max));
         s.emplace_back(norm_x, Geom::Point(origin[Geom::X], y_proj_along_x_min));
-        s.emplace_back(Geom::Point(1, 0), Geom::Point(x_max, 0));
+        s.emplace_back(norm_z, Geom::Point(origin[Geom::X], y_proj_along_z_max));
+        if (is_y_vertical) {
+            s.emplace_back(Geom::Point(1, 0), Geom::Point(x_max, 0));
+        }
     }
 
     if (use_right_half) {
-        s.emplace_back(norm_z, Geom::Point(origin[Geom::X], y_proj_along_z_min));
         s.emplace_back(norm_x, Geom::Point(origin[Geom::X], y_proj_along_x_max));
-        s.emplace_back(Geom::Point(1, 0), Geom::Point(x_min, 0));
+        s.emplace_back(norm_z, Geom::Point(origin[Geom::X], y_proj_along_z_min));
+        if (is_y_vertical) {
+            s.emplace_back(Geom::Point(1, 0), Geom::Point(x_min, 0));
+        }
+    }
+
+    if (!is_y_vertical) {
+        s.emplace_back(norm_y, Geom::Point(origin[Geom::X], y_proj_along_y_min));
+        s.emplace_back(norm_y, Geom::Point(origin[Geom::X], y_proj_along_y_max));
     }
 
     return s;
 }
 
-} // namepsace Inkscape
+} // namespace Inkscape

@@ -535,6 +535,7 @@ protected:
         UI::Widget::PrefSpinButton      _grids_axonom_spacing_y;
         UI::Widget::PrefSpinButton      _grids_axonom_angle_x;
         UI::Widget::PrefSpinButton      _grids_axonom_angle_z;
+        UI::Widget::PrefCheckButton     _grids_axonom_angle_y_vertical;
         UI::Widget::PrefColorPicker     _grids_axonom_color;
         UI::Widget::PrefColorPicker     _grids_axonom_empcolor;
         UI::Widget::PrefSpinButton      _grids_axonom_empspacing;

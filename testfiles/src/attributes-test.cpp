@@ -556,6 +556,7 @@ std::vector<AttributeInfo> getKnownAttrs()
         AttributeInfo("spacingy", true),
         AttributeInfo("gridanglex", true),
         AttributeInfo("gridanglez", true),
+        AttributeInfo("angleyvertical", true),
         AttributeInfo("enabled", true),
         AttributeInfo("visible", true),
         AttributeInfo("empopacity", true),

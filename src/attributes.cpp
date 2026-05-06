@@ -150,6 +150,7 @@ static SPStyleProp const props[] = {
     {SPAttr::SPACINGY, "spacingy"},
     {SPAttr::ANGLE_X, "gridanglex"},
     {SPAttr::ANGLE_Z, "gridanglez"},
+    {SPAttr::ANGLE_Y_VERTICAL, "angleyvertical"},
     {SPAttr::GAP_X, "gapx"},
     {SPAttr::GAP_Y, "gapy"},
     {SPAttr::MARGIN_X, "marginx"},

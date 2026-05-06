@@ -149,6 +149,7 @@ enum class SPAttr {
     SPACINGY,
     ANGLE_X,
     ANGLE_Z,
+    ANGLE_Y_VERTICAL,
     GAP_X,
     GAP_Y,
     MARGIN_X,

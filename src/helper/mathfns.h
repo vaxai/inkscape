@@ -110,6 +110,29 @@ T safeclamp(T val, T lo, T hi)
     }
     return val;
 }
+
+/**
+ * Calculate the angle of the second diagonal of a parallelogram with one vertical diagonal.
+ * Given a parallelogram where one diagonal is vertical and the two angles on either side
+ * of that vertical diagonal are angle_x and angle_z, this function computes the angle of
+ * the second diagonal. This is used in axonometric grids to derive the y-axis angle from
+ * the x and z axes angles, ensuring the three axes intersect at a single point.
+ *
+ * \param angle_x_rad X-axis angle in radians
+ * \param angle_z_rad Z-axis angle in radians
+ * \return Y-axis angle in radians
+ */
+inline double derived_angle_y(double angle_x_rad, double angle_z_rad)
+{
+    // Adjust input angles by subtracting from π/2
+    double adjusted_x = M_PI_2 - angle_x_rad;
+    double adjusted_z = M_PI_2 - angle_z_rad;
+    double cot_x = 1.0 / std::tan(adjusted_x);
+    double cot_z = 1.0 / std::tan(adjusted_z);
+    double cot_y = (cot_x - cot_z) / 2.0;
+    double angle_y_rad = std::atan(1.0 / cot_y);
+    return M_PI_2 - angle_y_rad;
+}
 } // namespace Inkscape::Util
 
 #endif // INKSCAPE_HELPER_MATHFNS_H
