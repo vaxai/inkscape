@@ -475,30 +475,75 @@ void ColorPalette::_enable_scrollbar(bool show) {
     set_up_scrolling();
 }
 
-void ColorPalette::set_up_scrolling() {
-    auto &box = get_widget<Gtk::Box>(_builder, "palette-box");
-    auto &btn_menu = get_widget<Gtk::MenuButton>(_builder, "btn-menu");
-    auto const n_colors = UI::get_n_children(_normal_box);
-    auto normal_count = std::max<int>(1, n_colors);
-    auto pinned_count = std::max<int>(1, UI::get_n_children(_pinned_box));
+void ColorPalette::apply_flowbox_line_limits(int normal_count, int pinned_count)
+{
+    normal_count = std::max(1, normal_count);
+    pinned_count = std::max(1, pinned_count);
 
-    _normal_box.set_max_children_per_line(normal_count);
-    _normal_box.set_min_children_per_line(1);
-    _pinned_box.set_max_children_per_line(pinned_count);
-    _pinned_box.set_min_children_per_line(1);
+    int normal_max = normal_count;
+    int normal_min = 1;
+    int pinned_max = pinned_count;
+    int pinned_min = 1;
 
     auto alloc_width = _normal_box.get_parent()->get_allocated_width();
     // if page-size is defined, align color tiles in columns
-    if (!(_rows == 1 && _force_scrollbar) && _page_size > 1 && alloc_width > 1 && !_show_labels && n_colors > 0) {
+    if (!(_rows == 1 && _force_scrollbar) && _page_size > 1 && alloc_width > 1 && !_show_labels && normal_count > 0) {
         int width = get_tile_width();
         if (width > 1) {
             int cols = alloc_width / (width + _border);
             cols = std::max(cols - cols % _page_size, _page_size);
-            if (_normal_box.get_max_children_per_line() != cols) {
-                _normal_box.set_max_children_per_line(cols);
-            }
+            normal_max = cols;
         }
     }
+
+    if (_compact) {
+        if (_rows == 1 && _force_scrollbar) {
+            // horizontal scrolling with single row: all tiles on one line
+            normal_min = normal_count;
+            normal_max = normal_count;
+        }
+        int div = _large_pinned_panel ? (_rows > 2 ? 2 : 1) : _rows;
+        pinned_max = std::max((pinned_count + div - 1) / div, 1);
+    }
+
+    if (_normal_max_per_line != normal_max) {
+        _normal_box.set_max_children_per_line(normal_max);
+        _normal_max_per_line = normal_max;
+    }
+    if (_normal_min_per_line != normal_min) {
+        _normal_box.set_min_children_per_line(normal_min);
+        _normal_min_per_line = normal_min;
+    }
+    if (_pinned_max_per_line != pinned_max) {
+        _pinned_box.set_max_children_per_line(pinned_max);
+        _pinned_max_per_line = pinned_max;
+    }
+    if (_pinned_min_per_line != pinned_min) {
+        _pinned_box.set_min_children_per_line(pinned_min);
+        _pinned_min_per_line = pinned_min;
+    }
+}
+
+void ColorPalette::set_up_scrolling() {
+    auto &box = get_widget<Gtk::Box>(_builder, "palette-box");
+    auto &btn_menu = get_widget<Gtk::MenuButton>(_builder, "btn-menu");
+
+    // Prefer the item lists we own over walking FlowBox children; during a mass
+    // rebuild the lists are authoritative and cheaper to count (issue #4396).
+    auto normal_count = std::max<int>(1, static_cast<int>(_normal_items.size()));
+    auto pinned_count = std::max<int>(1, static_cast<int>(_pinned_items.size()));
+    if (!_rebuilding_widgets) {
+        // Outside rebuild, FlowBox may temporarily lag behind list sizes; fall back
+        // to live child counts when the lists are empty but widgets remain.
+        if (_normal_items.empty()) {
+            normal_count = std::max<int>(1, static_cast<int>(UI::get_n_children(_normal_box)));
+        }
+        if (_pinned_items.empty()) {
+            pinned_count = std::max<int>(1, static_cast<int>(UI::get_n_children(_pinned_box)));
+        }
+    }
+
+    apply_flowbox_line_limits(normal_count, pinned_count);
 
     if (_compact) {
         box.set_orientation(Gtk::Orientation::HORIZONTAL);
@@ -514,9 +559,6 @@ void ColorPalette::set_up_scrolling() {
         _normal_box.set_valign(Gtk::Align::END);
 
         if (_rows == 1 && _force_scrollbar) {
-            // horizontal scrolling with single row
-            _normal_box.set_min_children_per_line(normal_count);
-
             _scroll_btn.set_visible(false);
 
             if (_force_scrollbar) {
@@ -541,8 +583,6 @@ void ColorPalette::set_up_scrolling() {
             _scroll_btn.set_visible(true);
         }
 
-        int div = _large_pinned_panel ? (_rows > 2 ? 2 : 1) : _rows;
-        _pinned_box.set_max_children_per_line(std::max((pinned_count + div - 1) / div, 1));
         _pinned_box.set_margin_end(_border);
     }
     else {
@@ -621,25 +661,40 @@ bool ColorPalette::are_labels_enabled() const {
 }
 
 void ColorPalette::resize() {
+    int scroll_height_request = -1;
+    int scroll_width_request = -1;
     if ((_rows == 1 && _force_scrollbar) || !_compact) {
         // auto size for single row to allocate space for scrollbar
-        _scroll.set_size_request(-1, -1);
+        scroll_height_request = -1;
+        scroll_width_request = -1;
     }
     else {
         // exact size for multiple rows
-        int height = get_palette_height() - _border;
-        _scroll.set_size_request(1, height);
+        scroll_height_request = get_palette_height() - _border;
+        scroll_width_request = 1;
+    }
+    if (_applied_scroll_height != scroll_height_request) {
+        _scroll.set_size_request(scroll_width_request, scroll_height_request);
+        _applied_scroll_height = scroll_height_request;
     }
 
-    _normal_box.set_column_spacing(_border);
-    _normal_box.set_row_spacing(_border);
-    _pinned_box.set_column_spacing(_border);
-    _pinned_box.set_row_spacing(_border);
+    if (_applied_border != _border) {
+        _normal_box.set_column_spacing(_border);
+        _normal_box.set_row_spacing(_border);
+        _pinned_box.set_column_spacing(_border);
+        _pinned_box.set_row_spacing(_border);
+        _applied_border = _border;
+    }
 
     int width = get_tile_width();
     int height = get_tile_height();
-    for (auto const &item : _normal_items) {
-        item->set_size_request(width, height);
+    bool normal_size_changed = (_applied_tile_width != width || _applied_tile_height != height);
+    if (normal_size_changed) {
+        for (auto const &item : _normal_items) {
+            item->set_size_request(width, height);
+        }
+        _applied_tile_width = width;
+        _applied_tile_height = height;
     }
 
     int pinned_width = width;
@@ -648,21 +703,41 @@ void ColorPalette::resize() {
         double mult = _rows > 2 ? _rows / 2.0 : 2.0;
         pinned_width = pinned_height = static_cast<int>((height + _border) * mult - _border);
     }
-    for (auto const &item : _pinned_items) {
-        item->set_size_request(pinned_width, pinned_height);
+    bool pinned_size_changed = (_applied_pinned_width != pinned_width || _applied_pinned_height != pinned_height);
+    if (pinned_size_changed) {
+        for (auto const &item : _pinned_items) {
+            item->set_size_request(pinned_width, pinned_height);
+        }
+        _applied_pinned_width = pinned_width;
+        _applied_pinned_height = pinned_height;
     }
 }
 
 void ColorPalette::set_colors(std::vector<std::unique_ptr<Dialog::ColorItem>> coloritems)
 {
+    // Dropping thousands of FlowBox children is the dominant cost when switching
+    // large palettes (issue #4396). Hide the palette while we rebuild so GTK does
+    // not attempt intermediate layout/draw passes for each append.
+    bool const was_visible = get_visible();
+    if (was_visible) {
+        set_visible(false);
+    }
+
     _normal_items.clear();
     _pinned_items.clear();
+    // Force tile size application on the next resize() since all widgets are new.
+    _applied_tile_width = -1;
+    _applied_tile_height = -1;
+    _applied_pinned_width = -1;
+    _applied_pinned_height = -1;
 
     for (auto& item : coloritems) {
         item->signal_modified().connect([item = item.get()] {
-            for (auto &w : children(*item->get_parent())) {
-                if (auto label = dynamic_cast<Gtk::Label *>(&w)) {
-                    label->set_text(item->get_description());
+            if (auto parent = item->get_parent()) {
+                for (auto &w : children(*parent)) {
+                    if (auto label = dynamic_cast<Gtk::Label *>(&w)) {
+                        label->set_text(item->get_description());
+                    }
                 }
             }
         });
@@ -673,7 +748,12 @@ void ColorPalette::set_colors(std::vector<std::unique_ptr<Dialog::ColorItem>> co
         }
     }
     rebuild_widgets();
-    refresh();
+    // rebuild_widgets already configures scrolling/sizing; refresh only queues a resize.
+    queue_resize();
+
+    if (was_visible) {
+        set_visible(true);
+    }
 }
 
 Gtk::Widget *ColorPalette::_get_widget(Dialog::ColorItem *item) {
@@ -691,11 +771,33 @@ Gtk::Widget *ColorPalette::_get_widget(Dialog::ColorItem *item) {
 
 void ColorPalette::rebuild_widgets()
 {
+    _rebuilding_widgets = true;
+
     _normal_box.freeze_notify();
     _pinned_box.freeze_notify();
 
     _normal_box.remove_all();
     _pinned_box.remove_all();
+
+    // Pre-size tiles and configure FlowBox line limits *before* appending children
+    // so GTK does not reflow with default (often 1-per-line) limits mid-insert.
+    int normal_count = 0;
+    for (auto const &item : _normal_items) {
+        if (!_show_labels && item->is_group()) continue;
+        if (_show_labels && item->is_filler()) continue;
+        ++normal_count;
+    }
+    int pinned_count = static_cast<int>(_pinned_items.size());
+    apply_flowbox_line_limits(std::max(1, normal_count), std::max(1, pinned_count));
+
+    int width = get_tile_width();
+    int height = get_tile_height();
+    int pinned_width = width;
+    int pinned_height = height;
+    if (_large_pinned_panel) {
+        double mult = _rows > 2 ? _rows / 2.0 : 2.0;
+        pinned_width = pinned_height = static_cast<int>((height + _border) * mult - _border);
+    }
 
     for (auto const &item : _normal_items) {
         // in a tile mode (no labels) group headers are hidden:
@@ -704,16 +806,25 @@ void ColorPalette::rebuild_widgets()
         // in a list mode with labels, do not show fillers:
         if (_show_labels && item->is_filler()) continue;
 
+        item->set_size_request(width, height);
         _normal_box.append(*_get_widget(item.get()));
     }
     for (auto const &item : _pinned_items) {
+        item->set_size_request(pinned_width, pinned_height);
         _pinned_box.append(*_get_widget(item.get()));
     }
+
+    _applied_tile_width = width;
+    _applied_tile_height = height;
+    _applied_pinned_width = pinned_width;
+    _applied_pinned_height = pinned_height;
 
     set_up_scrolling();
 
     _normal_box.thaw_notify();
     _pinned_box.thaw_notify();
+
+    _rebuilding_widgets = false;
 }
 
 void ColorPalette::set_palettes(std::vector<palette_t> const &palettes)

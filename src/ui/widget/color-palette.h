@@ -116,6 +116,7 @@ private:
     Gtk::Widget *_get_widget(Dialog::ColorItem *item);
     void rebuild_widgets();
     void refresh();
+    void apply_flowbox_line_limits(int normal_count, int pinned_count);
 
     std::vector<std::unique_ptr<Dialog::ColorItem>> _normal_items;
     std::vector<std::unique_ptr<Dialog::ColorItem>> _pinned_items;
@@ -148,6 +149,19 @@ private:
     bool _show_labels = false;
     int _page_size = 0;
     Geom::IntPoint _allocation;
+    // Cached FlowBox line limits; Gtk::FlowBox recomputes layout when these change,
+    // which is expensive for large palettes (issue #4396), so only push real changes.
+    int _normal_max_per_line = -1;
+    int _normal_min_per_line = -1;
+    int _pinned_max_per_line = -1;
+    int _pinned_min_per_line = -1;
+    int _applied_tile_width = -1;
+    int _applied_tile_height = -1;
+    int _applied_pinned_width = -1;
+    int _applied_pinned_height = -1;
+    int _applied_border = -1;
+    int _applied_scroll_height = -2; // -2 = unset; -1 = natural size request
+    bool _rebuilding_widgets = false;
 };
 
 } // namespace Widget

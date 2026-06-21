@@ -123,6 +123,7 @@ set(TEST_SOURCES
     sp-document-test
     object-colors-test
     multi-marker-color-wheel-test
+    color-palette-perf-test
     ${LPE_TESTS_64bit}
     ${LIBNRTYPE_TESTS}
     )
