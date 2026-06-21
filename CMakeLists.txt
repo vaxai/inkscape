@@ -128,6 +128,13 @@ mark_as_advanced(WITH_FUZZ)
 option(WITH_MANPAGE_COMPRESSION "gzips manpages if gzip is available" ON)
 mark_as_advanced(WITH_MANPAGE_COMPRESSION)
 
+# Performance testing (perf + FlameGraph).  Fully configured later in
+# CMakeScripts/PerformanceTest.cmake once BUILD_TYPE / perf / FlameGraph are known.
+# Default follows debug-symbol availability; override explicitly as needed.
+option(BUILD_PERFORMANCE_TESTS
+    "Enable perf/FlameGraph performance tests (requires debug symbols and Linux perf)"
+    OFF)
+
 option(ENABLE_BINRELOC "Enable relocatable binaries" OFF)
 
 
@@ -171,6 +178,10 @@ if(BUILD_TESTING OR NOT DEFINED BUILD_TESTING)
     if(GTEST_FOUND)
         set(DART_TESTING_TIMEOUT 180 CACHE STRING "Test timeout") # if running for > 180 s something must be wrong)
         include(CTest)
+        # Performance testing helpers (perf + FlameGraph).  Safe no-op when
+        # unavailable; registers add_performance_test() and friends for use
+        # from testfiles/ and CMakeScripts/UnitTest.cmake.
+        include(CMakeScripts/PerformanceTest.cmake)
         add_subdirectory(testfiles EXCLUDE_FROM_ALL)
     else()
         set(BUILD_TESTING OFF)
@@ -285,6 +296,14 @@ message("WITH_INTERNAL_ADAPTAGRAMS:   ${WITH_INTERNAL_ADAPTAGRAMS}")
 message("WITH_PROFILING:              ${WITH_PROFILING}")
 message("BUILD_TESTING:               ${BUILD_TESTING}")
 message("TESTS_WITH_ASAN:             ${TESTS_WITH_ASAN}")
+message("BUILD_PERFORMANCE_TESTS:     ${BUILD_PERFORMANCE_TESTS}")
+if(DEFINED INKSCAPE_PERFORMANCE_TESTS_AVAILABLE)
+message("PERF_TESTS_AVAILABLE:        ${INKSCAPE_PERFORMANCE_TESTS_AVAILABLE}")
+message("PERF_TEST_ITERATIONS:        ${PERF_TEST_ITERATIONS}")
+message("PERF_TEST_MAX_TIME:          ${PERF_TEST_MAX_TIME}")
+message("PERF_TEST_CALL_STACK_MODE:   ${PERF_TEST_CALL_STACK_MODE}")
+message("PERF_TEST_REPORT_DIR:        ${PERF_TEST_REPORT_DIR}")
+endif()
 
 if(WIN32)
 message("")
