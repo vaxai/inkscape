@@ -24,7 +24,7 @@
 # -----------------------------------------------------------------------------
 # Build-type / debug-symbol gate
 # -----------------------------------------------------------------------------
-set(_INKSCAPE_BUILD_TYPES_WITH_DEBUG_SYMBOLS "Debug" "RelWithDebInfo" "Strict")
+set(_INKSCAPE_BUILD_TYPES_WITH_DEBUG_SYMBOLS "Debug" "RelWithDebInfo" "Strict" "Flathub")
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _INKSCAPE_BUILD_TYPE_UPPER)
 
 set(INKSCAPE_HAS_DEBUG_SYMBOLS OFF)

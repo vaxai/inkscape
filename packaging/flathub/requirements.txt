@@ -1,0 +1,12 @@
+appdirs
+cachecontrol[filecache]
+cssselect
+pybind11
+Pillow
+requests
+cachecontrol
+lxml
+scour
+meson-python
+numpy
+tinycss2

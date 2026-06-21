@@ -24,7 +24,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMakeScripts/Modules")
 
 # Build in Release mode by default.
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-    "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel Strict.")
+    "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel Strict Flathub.")
 
 project(inkscape)
 
@@ -75,6 +75,31 @@ set(CMAKE_C_FLAGS_STRICT   "${CMAKE_C_FLAGS_DEBUG}   -Werror=deprecated-declarat
 mark_as_advanced(
     CMAKE_CXX_FLAGS_STRICT
     CMAKE_C_FLAGS_STRICT)
+
+# Flathub build type: RelWithDebInfo baseline plus the GLib version floor used
+# by the Flathub Flatpak manifest (org.inkscape.Inkscape).  Use this when
+# configuring a local build that should mirror the Flathub package for debug.
+set(CMAKE_CXX_FLAGS_FLATHUB "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_66"
+    CACHE STRING
+    "Flags used by C++ compiler during Flathub builds"
+    FORCE)
+set(CMAKE_C_FLAGS_FLATHUB   "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_66"
+    CACHE STRING
+    "Flags used by C compiler during Flathub builds"
+    FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_FLATHUB "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}"
+    CACHE STRING
+    "Flags used for linking binaries during Flathub builds"
+    FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_FLATHUB "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}"
+    CACHE STRING
+    "Flags used by the shared libraries linker during Flathub builds"
+    FORCE)
+mark_as_advanced(
+    CMAKE_CXX_FLAGS_FLATHUB
+    CMAKE_C_FLAGS_FLATHUB
+    CMAKE_EXE_LINKER_FLAGS_FLATHUB
+    CMAKE_SHARED_LINKER_FLAGS_FLATHUB)
 
 # -----------------------------------------------------------------------------
 # Redirect output files
