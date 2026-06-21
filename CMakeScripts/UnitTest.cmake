@@ -57,7 +57,57 @@ function(add_unit_test test_name)
     foreach(arg_env ${ARG_ENVIRONMENT})
         set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT "${arg_env}")
     endforeach()
+
+    # Optional per-test performance counterpart (only when perf framework is active).
+    # Developers can pass PERF_ITERATIONS / PERF_MAX_TIME / PERF_CALL_STACK_MODE
+    # through ENVIRONMENT is not used; instead honour optional args:
+    #   PERF_ITERATIONS, PERF_MAX_TIME, PERF_CALL_STACK_MODE as extra oneValueArgs
+    # are handled below if the caller provided them via ARGN already parsed above.
 endfunction(add_unit_test)
+
+# Extended unit-test helper that also registers a perf_ counterpart when the
+# performance framework is available.  Existing add_unit_test() is unchanged.
+# Usage:
+#   add_unit_test_with_perf(my-test TEST_SOURCE my-test.cpp
+#       [PERF_ITERATIONS 10] [PERF_MAX_TIME 30] [PERF_CALL_STACK_MODE userspace]
+#       ...)
+function(add_unit_test_with_perf test_name)
+    set(SINGL_VALUE_ARGS TEST_SOURCE PERF_ITERATIONS PERF_MAX_TIME PERF_CALL_STACK_MODE)
+    set(MULTI_VALUE_ARGS SOURCES EXTRA_LIBS ENVIRONMENT)
+    cmake_parse_arguments(ARG "UNUSED_OPTIONS" "${SINGL_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+
+    # Delegate to the normal unit-test registration first.
+    set(_unit_args "")
+    if(ARG_TEST_SOURCE)
+        list(APPEND _unit_args TEST_SOURCE "${ARG_TEST_SOURCE}")
+    endif()
+    if(ARG_SOURCES)
+        list(APPEND _unit_args SOURCES ${ARG_SOURCES})
+    endif()
+    if(ARG_EXTRA_LIBS)
+        list(APPEND _unit_args EXTRA_LIBS ${ARG_EXTRA_LIBS})
+    endif()
+    if(ARG_ENVIRONMENT)
+        list(APPEND _unit_args ENVIRONMENT ${ARG_ENVIRONMENT})
+    endif()
+    add_unit_test(${test_name} ${_unit_args})
+
+    if(NOT INKSCAPE_PERFORMANCE_TESTS_AVAILABLE)
+        return()
+    endif()
+
+    set(_perf_args LABELS unit)
+    if(ARG_PERF_ITERATIONS)
+        list(APPEND _perf_args ITERATIONS "${ARG_PERF_ITERATIONS}")
+    endif()
+    if(ARG_PERF_MAX_TIME)
+        list(APPEND _perf_args MAX_TIME "${ARG_PERF_MAX_TIME}")
+    endif()
+    if(ARG_PERF_CALL_STACK_MODE)
+        list(APPEND _perf_args CALL_STACK_MODE "${ARG_PERF_CALL_STACK_MODE}")
+    endif()
+    add_performance_test_for_existing(${test_name} ${_perf_args})
+endfunction(add_unit_test_with_perf)
 
 function(add_unit_tests)
     set(MULTI_VALUE_ARGS "TEST_SOURCES" "SOURCES" "EXTRA_LIBS" "ENVIRONMENT")
