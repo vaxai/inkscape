@@ -248,6 +248,12 @@ add_subdirectory(cli_tests)
 add_subdirectory(rendering_tests)
 add_subdirectory(lpe_tests)
 
+### Performance tests (perf + FlameGraph) – additive; never modifies existing tests
+if(DEFINED INKSCAPE_PERFORMANCE_TESTS_AVAILABLE AND INKSCAPE_PERFORMANCE_TESTS_AVAILABLE)
+    add_subdirectory(performance)
+    inkscape_performance_finalize()
+endif()
+
 ### Fuzz test
 if(WITH_FUZZ)
     # to use the fuzzer, make sure you use the right compiler (clang)
