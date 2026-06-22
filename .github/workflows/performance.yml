@@ -13,7 +13,11 @@ on:
   pull_request:
     branches: [master]
   push:
-    branches: [master]
+    branches:
+      - master
+      # Temporary: also run on this feature branch while we iterate on the workflow
+      # before a PR exists. Remove once the PR is open and green.
+      - feature/perf-flamegraph-reports-svg-only
   # Allow maintainers to re-run perf suite on a branch without opening a PR.
   workflow_dispatch:
 
