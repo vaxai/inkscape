@@ -1,14 +1,11 @@
 # Performance tests (Linux perf + FlameGraph)
 #
 # Runs on every pull request targeting master, and on every push/merge to master.
-# Uses the official Inkscape CI Docker image so GTK/gtkmm and other deps match
-# GitLab CI (avoids Ubuntu 24.04's too-old system gtkmm and incomplete in-tree
-# gtkmm bootstrap on stock runners).
+# Uses Ubuntu 26.04 so system gtkmm meets Inkscape's >=4.13.3 requirement (24.04
+# only has 4.10 and forces a fragile in-tree gtkmm bootstrap).
 #
 # Cost: this repository is public, so GitHub Actions minutes are free/unlimited
-# for standard GitHub-hosted runners. Private repos get a monthly free allowance
-# (extra minutes are billed). Self-hosted runners are always free of GitHub
-# minute charges.
+# for standard GitHub-hosted runners. Private repos get a monthly free allowance.
 
 name: Performance Tests
 
@@ -35,19 +32,16 @@ env:
   PERF_TEST_MAX_TIME: "30"
   PERF_TEST_CALL_STACK_MODE: userspace
   PERF_TEST_POSTPROCESS_TIME: "300"
-  # Memory-safe default; inkscape_base TUs are large in RelWithDebInfo.
   CMAKE_BUILD_PARALLEL_LEVEL: "2"
 
 jobs:
   performance:
-    name: perf + FlameGraph (Inkscape CI image)
-    runs-on: ubuntu-latest
+    name: perf + FlameGraph (Ubuntu 26.04)
+    # Inkscape 1.5+ needs gtkmm >= 4.13.3; Ubuntu 26.04 ships a new enough gtkmm,
+    # matching the inkscape-ci-docker base image. Fall back is handled by a
+    # secondary job only if this runner label ever disappears.
+    runs-on: ubuntu-26.04
     timeout-minutes: 360
-    # Official Inkscape build image (Ubuntu 26.04 + full deps). Privileged so
-    # Linux perf can open perf_events inside the container.
-    container:
-      image: registry.gitlab.com/inkscape/inkscape-ci-docker/master
-      options: --privileged
 
     steps:
       - name: Checkout
@@ -55,44 +49,55 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install perf + xvfb inside CI image
+      - name: Add swap (avoid OOM during RelWithDebInfo build)
         run: |
-          set -eux
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          # Kernel-specific perf may not match the host kernel; install common + generic.
-          apt-get install -y --no-install-recommends \
-            ccache \
-            linux-tools-common \
-            linux-tools-generic \
-            xvfb \
-            dbus-x11 \
-            || true
-          # Try exact kernel package when available on this runner image.
-          apt-get install -y --no-install-recommends "linux-tools-$(uname -r)" || true
+          set -euxo pipefail
+          if ! swapon --show | grep -q .; then
+            sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
+          free -h
 
+      - name: Install system dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ccache cmake ninja-build git wget ca-certificates python3 pkg-config \
+            xvfb dbus-x11 \
+            linux-tools-common linux-tools-generic \
+            glslc mm-common libgstreamer-plugins-bad1.0-dev || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            "linux-tools-$(uname -r)" || true
+
+          wget -q -O /tmp/install_dependencies.sh \
+            "https://gitlab.com/inkscape/inkscape-ci-docker/-/raw/master/install_dependencies.sh"
+          # --full mirrors the CI Docker image; --recommended is a lighter fallback.
+          if ! bash /tmp/install_dependencies.sh --full; then
+            echo "install_dependencies --full failed; retrying --recommended"
+            bash /tmp/install_dependencies.sh --recommended
+          fi
+
+      - name: Verify perf availability
+        run: |
+          set -euxo pipefail
           if ! command -v perf >/dev/null 2>&1; then
             if command -v "perf_$(uname -r)" >/dev/null 2>&1; then
-              ln -sf "$(command -v "perf_$(uname -r)")" /usr/local/bin/perf
+              sudo ln -sf "$(command -v "perf_$(uname -r)")" /usr/local/bin/perf
             else
-              # Fallback: any perf_* on PATH
-              perf_bin="$(command -v perf_* 2>/dev/null | head -1 || true)"
+              perf_bin="$(ls /usr/lib/linux-tools/*/perf 2>/dev/null | head -1 || true)"
               if [ -n "${perf_bin}" ]; then
-                ln -sf "${perf_bin}" /usr/local/bin/perf
+                sudo ln -sf "${perf_bin}" /usr/local/bin/perf
+              else
+                echo "perf not found" >&2
+                exit 1
               fi
             fi
           fi
-          command -v perf
-          perf --version || perf version || true
-
-      - name: Enable perf events
-        run: |
-          set -eux
-          if [ -w /proc/sys/kernel/perf_event_paranoid ]; then
-            echo -1 > /proc/sys/kernel/perf_event_paranoid || echo 1 > /proc/sys/kernel/perf_event_paranoid || true
-          else
-            sysctl -w kernel.perf_event_paranoid=-1 || sysctl -w kernel.perf_event_paranoid=1 || true
-          fi
+          perf --version || true
+          sudo sysctl -w kernel.perf_event_paranoid=-1 || sudo sysctl -w kernel.perf_event_paranoid=1 || true
           cat /proc/sys/kernel/perf_event_paranoid || true
           perf record -o /tmp/perf-sanity.data -- sleep 0.1
           perf script -i /tmp/perf-sanity.data | head -3 || true
@@ -102,14 +107,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: perf-ccache-ciimg-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}
+          key: perf-ccache-u2604-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}
           restore-keys: |
-            perf-ccache-ciimg-${{ env.CMAKE_BUILD_TYPE }}-
-            perf-ccache-ciimg-
+            perf-ccache-u2604-${{ env.CMAKE_BUILD_TYPE }}-
+            perf-ccache-u2604-
 
       - name: Configure (RelWithDebInfo + performance tests)
         run: |
-          set -eux
+          set -euxo pipefail
           ccache --zero-stats || true
           cmake -S . -B "${BUILD_DIR}" -G Ninja \
             -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
@@ -122,69 +127,58 @@ jobs:
             -DPERF_TEST_POSTPROCESS_TIME="${PERF_TEST_POSTPROCESS_TIME}" \
             -DPERF_TEST_CALL_STACK_MODE="${PERF_TEST_CALL_STACK_MODE}" \
             2>&1 | tee cmake-configure.log
-          grep -E 'Performance testing|Registered .* performance tests|PERF_TESTS_AVAILABLE|gtkmm|GTKMM' \
-            cmake-configure.log || true
+          # Fail fast if gtkmm is still too old (would try incomplete in-tree bootstrap).
+          if grep -q "GTKMM too old" cmake-configure.log; then
+            echo "System gtkmm is still too old; refusing to continue with in-tree gtkmm bootstrap." >&2
+            exit 1
+          fi
+          grep -E 'Performance testing|PERF_TESTS_AVAILABLE|gtkmm|GTKMM' cmake-configure.log || true
 
       - name: Build inkscape
         run: |
-          set -eux
+          set -euxo pipefail
           cmake --build "${BUILD_DIR}" --target inkscape 2>&1 | tee build-inkscape.log
           ccache --show-stats || true
 
       - name: Build integration tests target
         run: |
-          set -eux
+          set -euxo pipefail
           cmake --build "${BUILD_DIR}" --target tests 2>&1 | tee build-tests.log
 
       - name: Build unit_tests target
         run: |
-          set -eux
+          set -euxo pipefail
           cmake --build "${BUILD_DIR}" --target unit_tests 2>&1 | tee build-unit_tests.log
 
       - name: List registered performance tests
         run: |
-          set -eux
+          set -euxo pipefail
           ctest --test-dir "${BUILD_DIR}" -N -L performance | tee perf-test-list.txt
           count="$(ctest --test-dir "${BUILD_DIR}" -N -L performance | grep -c 'Test #' || true)"
           echo "Registered performance tests: ${count}"
           if [ "${count:-0}" -lt 1 ]; then
-            echo "No performance tests were registered; failing so misconfiguration is visible." >&2
+            echo "No performance tests were registered." >&2
             exit 1
           fi
 
       - name: Run performance tests
         run: |
-          set -eux
-          if [ -w /proc/sys/kernel/perf_event_paranoid ]; then
-            echo -1 > /proc/sys/kernel/perf_event_paranoid || true
-          else
-            sysctl -w kernel.perf_event_paranoid=-1 || true
-          fi
-
+          set -euxo pipefail
+          sudo sysctl -w kernel.perf_event_paranoid=-1 || sudo sysctl -w kernel.perf_event_paranoid=1 || true
           export LIBGL_ALWAYS_SOFTWARE=1
-          # xvfb may be optional for pure unit tests but is needed for rendering/CLI paths.
-          if command -v xvfb-run >/dev/null 2>&1; then
-            xvfb-run -a --server-args="-screen 0 1024x768x24" \
-              ctest --test-dir "${BUILD_DIR}" \
-                -L performance \
-                --output-on-failure \
-                --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
-                -j1 2>&1 | tee ctest-performance.log
-          else
+          xvfb-run -a --server-args="-screen 0 1024x768x24" \
             ctest --test-dir "${BUILD_DIR}" \
               -L performance \
               --output-on-failure \
               --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
               -j1 2>&1 | tee ctest-performance.log
-          fi
 
       - name: Summarize flame graphs
         if: always()
         run: |
-          set -eux
+          set -euxo pipefail
           report_dir="${BUILD_DIR}/performance_reports"
           if [ -d "${report_dir}" ]; then
-            echo "=== Flame graph SVGs ==="
             find "${report_dir}" -name '*.svg' -type f | sort | tee perf-report-index.txt
             echo "Count: $(find "${report_dir}" -name '*.svg' -type f | wc -l)"
           else
