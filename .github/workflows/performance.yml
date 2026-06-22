@@ -1,11 +1,16 @@
 # Performance tests (Linux perf + FlameGraph)
 #
-# Runs on every pull request targeting master, and on every push/merge to master.
-# Uses Ubuntu 26.04 so system gtkmm meets Inkscape's >=4.13.3 requirement (24.04
-# only has 4.10 and forces a fragile in-tree gtkmm bootstrap).
+# Triggers:
+#   - pull_request targeting master (every new/updated PR)
+#   - push to master (every merge/commit on master)
+#   - workflow_dispatch (manual re-run)
+#
+# Uses Ubuntu 26.04 so system gtkmm meets Inkscape's >=4.13.3 requirement.
+# Flame graph SVGs are uploaded as artifacts for review.
 #
 # Cost: this repository is public, so GitHub Actions minutes are free/unlimited
-# for standard GitHub-hosted runners. Private repos get a monthly free allowance.
+# for standard GitHub-hosted runners. Private repos get a monthly free allowance
+# (extra minutes are billed). Self-hosted runners incur no GitHub minute charges.
 
 name: Performance Tests
 
@@ -13,11 +18,7 @@ on:
   pull_request:
     branches: [master]
   push:
-    branches:
-      - master
-      # Temporary: also run on this feature branch while we iterate on the workflow
-      # before a PR exists. Remove once the PR is open and green.
-      - feature/perf-flamegraph-reports-svg-only
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
@@ -32,14 +33,15 @@ env:
   PERF_TEST_MAX_TIME: "30"
   PERF_TEST_CALL_STACK_MODE: userspace
   PERF_TEST_POSTPROCESS_TIME: "300"
+  # Perf CI measures speed; correctness failures in profiled binaries are
+  # reported as warnings and still produce flame graphs (normal CTest owns
+  # functional pass/fail).
+  PERF_TEST_ALLOW_WORKLOAD_FAILURE: "1"
   CMAKE_BUILD_PARALLEL_LEVEL: "2"
 
 jobs:
   performance:
     name: perf + FlameGraph (Ubuntu 26.04)
-    # Inkscape 1.5+ needs gtkmm >= 4.13.3; Ubuntu 26.04 ships a new enough gtkmm,
-    # matching the inkscape-ci-docker base image. Fall back is handled by a
-    # secondary job only if this runner label ever disappears.
     runs-on: ubuntu-26.04
     timeout-minutes: 360
 
@@ -74,7 +76,6 @@ jobs:
 
           wget -q -O /tmp/install_dependencies.sh \
             "https://gitlab.com/inkscape/inkscape-ci-docker/-/raw/master/install_dependencies.sh"
-          # --full mirrors the CI Docker image; --recommended is a lighter fallback.
           if ! bash /tmp/install_dependencies.sh --full; then
             echo "install_dependencies --full failed; retrying --recommended"
             bash /tmp/install_dependencies.sh --recommended
@@ -127,9 +128,8 @@ jobs:
             -DPERF_TEST_POSTPROCESS_TIME="${PERF_TEST_POSTPROCESS_TIME}" \
             -DPERF_TEST_CALL_STACK_MODE="${PERF_TEST_CALL_STACK_MODE}" \
             2>&1 | tee cmake-configure.log
-          # Fail fast if gtkmm is still too old (would try incomplete in-tree bootstrap).
           if grep -q "GTKMM too old" cmake-configure.log; then
-            echo "System gtkmm is still too old; refusing to continue with in-tree gtkmm bootstrap." >&2
+            echo "System gtkmm is still too old; refusing incomplete in-tree gtkmm bootstrap." >&2
             exit 1
           fi
           grep -E 'Performance testing|PERF_TESTS_AVAILABLE|gtkmm|GTKMM' cmake-configure.log || true
@@ -166,6 +166,7 @@ jobs:
           set -euxo pipefail
           sudo sysctl -w kernel.perf_event_paranoid=-1 || sudo sysctl -w kernel.perf_event_paranoid=1 || true
           export LIBGL_ALWAYS_SOFTWARE=1
+          export PERF_TEST_ALLOW_WORKLOAD_FAILURE="${PERF_TEST_ALLOW_WORKLOAD_FAILURE}"
           xvfb-run -a --server-args="-screen 0 1024x768x24" \
             ctest --test-dir "${BUILD_DIR}" \
               -L performance \
@@ -179,10 +180,16 @@ jobs:
           set -euxo pipefail
           report_dir="${BUILD_DIR}/performance_reports"
           if [ -d "${report_dir}" ]; then
-            find "${report_dir}" -name '*.svg' -type f | sort | tee perf-report-index.txt
-            echo "Count: $(find "${report_dir}" -name '*.svg' -type f | wc -l)"
+            find "${report_dir}" -name '*.svg' -type f ! -name '*-latest.svg' | sort | tee perf-report-index.txt
+            count="$(find "${report_dir}" -name '*.svg' -type f ! -name '*-latest.svg' | wc -l | tr -d ' ')"
+            echo "Flame graph count: ${count}"
+            if [ "${count:-0}" -lt 1 ]; then
+              echo "No flame graph SVGs were produced." >&2
+              exit 1
+            fi
           else
             echo "No performance_reports directory found." | tee perf-report-index.txt
+            exit 1
           fi
 
       - name: Upload flame graph artifacts

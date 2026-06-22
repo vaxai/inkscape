@@ -209,6 +209,13 @@ cleanup_intermediates() {
     rm -f "$PERF_DATA" "$PERF_SCRIPT_OUT" "$FOLDED_OUT" "$META_OUT" "${PERF_SCRIPT_OUT}.err"
 }
 
+# When PERF_TEST_ALLOW_WORKLOAD_FAILURE=1 (typical in perf CI), a non-zero exit
+# from the profiled command is treated as a warning: we still generate the flame
+# graph if perf.data exists. Timeouts and missing perf data remain hard errors.
+# Correctness of the underlying tests remains the job of the normal CTest suite.
+ALLOW_WORKLOAD_FAILURE="${PERF_TEST_ALLOW_WORKLOAD_FAILURE:-0}"
+WORKLOAD_RC=0
+
 # timeout returns 124 on expiry
 if [[ "$PERF_RC" -eq 124 ]]; then
     echo "run_perf_test.sh: FAIL: perf record exceeded maximum time of ${MAX_TIME}s (elapsed ~${RECORD_ELAPSED}s)" >&2
@@ -217,9 +224,19 @@ if [[ "$PERF_RC" -eq 124 ]]; then
 fi
 
 if [[ "$PERF_RC" -ne 0 ]]; then
-    echo "run_perf_test.sh: FAIL: perf record / command exited with ${PERF_RC}" >&2
-    cleanup_intermediates
-    exit "$PERF_RC"
+    if [[ ! -s "$PERF_DATA" ]]; then
+        echo "run_perf_test.sh: FAIL: perf record / command exited with ${PERF_RC} and no perf data was written" >&2
+        cleanup_intermediates
+        exit "$PERF_RC"
+    fi
+    if [[ "$ALLOW_WORKLOAD_FAILURE" == "1" || "$ALLOW_WORKLOAD_FAILURE" == "true" || "$ALLOW_WORKLOAD_FAILURE" == "yes" ]]; then
+        WORKLOAD_RC="$PERF_RC"
+        echo "run_perf_test.sh: WARN: profiled command exited with ${PERF_RC}; continuing to build flame graph (PERF_TEST_ALLOW_WORKLOAD_FAILURE=${ALLOW_WORKLOAD_FAILURE})" >&2
+    else
+        echo "run_perf_test.sh: FAIL: perf record / command exited with ${PERF_RC}" >&2
+        cleanup_intermediates
+        exit "$PERF_RC"
+    fi
 fi
 
 # Enforce max-time on the record/workload phase only (not flame-graph post-process)
@@ -267,7 +284,11 @@ ln -sfn "$(basename "$SVG_OUT")" "$LATEST_LINK"
 cleanup_intermediates
 
 echo
-echo "=== Performance test OK: ${TEST_NAME} ==="
+if [[ "$WORKLOAD_RC" -ne 0 ]]; then
+    echo "=== Performance test OK (workload had exit ${WORKLOAD_RC}): ${TEST_NAME} ==="
+else
+    echo "=== Performance test OK: ${TEST_NAME} ==="
+fi
 echo "  record elapsed:  ${RECORD_ELAPSED}s (limit ${MAX_TIME}s)"
 echo "  post-process:    ${POST_ELAPSED}s"
 echo "  total:           ${TOTAL_ELAPSED}s"
