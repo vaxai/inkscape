@@ -5,7 +5,9 @@
 # artifacts for review.
 #
 # Cost: this repository is public, so GitHub Actions minutes are free/unlimited
-# for standard GitHub-hosted runners. Private repos get a monthly free allowance.
+# for standard GitHub-hosted runners. Private repos get a monthly free allowance
+# (extra minutes are billed). Self-hosted runners are always free of GitHub
+# minute charges.
 
 name: Performance Tests
 
@@ -37,12 +39,14 @@ env:
   PERF_TEST_CALL_STACK_MODE: userspace
   # Post-process budget is separate; CTest timeout = MAX_TIME + this.
   PERF_TEST_POSTPROCESS_TIME: "300"
+  # Single-job compile parallelism; Inkscape is memory-heavy in RelWithDebInfo.
+  CMAKE_BUILD_PARALLEL_LEVEL: "1"
 
 jobs:
   performance:
     name: perf + FlameGraph (Ubuntu)
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 360
 
     steps:
       - name: Checkout
@@ -50,6 +54,19 @@ jobs:
         with:
           # Shallow is fine; submodules were converted to normal directories in this fork.
           fetch-depth: 1
+
+      - name: Add swap (avoid OOM during RelWithDebInfo build)
+        run: |
+          set -euxo pipefail
+          # GitHub-hosted runners have ~7 GB RAM; large C++ TUs can spike past that.
+          if [ ! -f /swapfile ]; then
+            sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
+          free -h
+          swapon --show || true
 
       - name: Install system dependencies
         run: |
@@ -95,10 +112,8 @@ jobs:
           fi
           perf --version
           # Allow non-root perf record (may be restricted on some hosts).
-          if [ -w /proc/sys/kernel/perf_event_paranoid ] || sudo -n true 2>/dev/null; then
-            sudo sysctl -w kernel.perf_event_paranoid=-1 || \
-              sudo sysctl -w kernel.perf_event_paranoid=1 || true
-          fi
+          sudo sysctl -w kernel.perf_event_paranoid=-1 || \
+            sudo sysctl -w kernel.perf_event_paranoid=1 || true
           cat /proc/sys/kernel/perf_event_paranoid || true
           # Sanity: record a trivial workload.
           perf record -o /tmp/perf-sanity.data -- sleep 0.1
@@ -127,14 +142,28 @@ jobs:
             -DPERF_TEST_ITERATIONS="${PERF_TEST_ITERATIONS}" \
             -DPERF_TEST_MAX_TIME="${PERF_TEST_MAX_TIME}" \
             -DPERF_TEST_POSTPROCESS_TIME="${PERF_TEST_POSTPROCESS_TIME}" \
-            -DPERF_TEST_CALL_STACK_MODE="${PERF_TEST_CALL_STACK_MODE}"
+            -DPERF_TEST_CALL_STACK_MODE="${PERF_TEST_CALL_STACK_MODE}" \
+            2>&1 | tee cmake-configure.log
+          # Surface perf registration status in the job log.
+          grep -E 'Performance testing|Registered .* performance tests|perf executable|unavailable' \
+            cmake-configure.log || true
 
-      - name: Build prerequisites (inkscape, tests, unit_tests)
+      - name: Build inkscape
         run: |
           set -euxo pipefail
-          # Limit parallelism slightly on 2-core runners to reduce OOM risk.
-          cmake --build "${BUILD_DIR}" --target inkscape tests unit_tests -j2
+          # Build sequentially with full log capture (OOM/compiler errors are otherwise lost).
+          cmake --build "${BUILD_DIR}" --target inkscape -j1 2>&1 | tee build-inkscape.log
           ccache --show-stats || true
+
+      - name: Build integration tests target
+        run: |
+          set -euxo pipefail
+          cmake --build "${BUILD_DIR}" --target tests -j1 2>&1 | tee build-tests.log
+
+      - name: Build unit_tests target
+        run: |
+          set -euxo pipefail
+          cmake --build "${BUILD_DIR}" --target unit_tests -j1 2>&1 | tee build-unit_tests.log
 
       - name: List registered performance tests
         run: |
@@ -161,7 +190,7 @@ jobs:
               -L performance \
               --output-on-failure \
               --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
-              -j1
+              -j1 2>&1 | tee ctest-performance.log
 
       - name: Summarize flame graphs
         if: always()
@@ -185,15 +214,21 @@ jobs:
             ${{ env.BUILD_DIR }}/performance_reports/
             perf-test-list.txt
             perf-report-index.txt
+            ctest-performance.log
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload CTest / build logs on failure
+      - name: Upload build / CTest logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: performance-failure-logs-${{ github.run_id }}
           path: |
+            cmake-configure.log
+            build-inkscape.log
+            build-tests.log
+            build-unit_tests.log
+            ctest-performance.log
             ${{ env.BUILD_DIR }}/Testing/Temporary/
             perf-test-list.txt
             perf-report-index.txt
