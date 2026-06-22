@@ -6,7 +6,8 @@
 #   - workflow_dispatch (manual re-run)
 #
 # Uses Ubuntu 26.04 so system gtkmm meets Inkscape's >=4.13.3 requirement.
-# Flame graph SVGs are uploaded as artifacts for review.
+# Flame graph SVGs are uploaded as CI artifacts (7-day retention) for review.
+# Intermediate perf/folded/script data is deleted on the runner (SVG-only reports).
 #
 # Cost: this repository is public, so GitHub Actions minutes are free/unlimited
 # for standard GitHub-hosted runners. Private repos get a monthly free allowance
@@ -17,11 +18,22 @@ name: Performance Tests
 on:
   pull_request:
     branches: [master]
+    # Skip perf CI for docs/style-only changes that cannot affect measured code.
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSES/**'
+      - '.gitignore'
   push:
     branches:
       - master
       # TEMP verification only — remove after the branch run is green.
       - feature/perf-flamegraph-reports-svg-only
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+      - 'LICENSES/**'
+      - '.gitignore'
   workflow_dispatch:
 
 concurrency:
@@ -32,6 +44,9 @@ env:
   CMAKE_BUILD_TYPE: RelWithDebInfo
   BUILD_DIR: build-perf
   CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 2G
+  CCACHE_COMPRESS: "1"
+  CCACHE_COMPRESSLEVEL: "5"
   PERF_TEST_ITERATIONS: "2"
   PERF_TEST_MAX_TIME: "30"
   PERF_TEST_CALL_STACK_MODE: userspace
@@ -40,13 +55,16 @@ env:
   # reported as warnings and still produce flame graphs (normal CTest owns
   # functional pass/fail).
   PERF_TEST_ALLOW_WORKLOAD_FAILURE: "1"
+  # Match runner cores conservatively; parallel link of Inkscape is RAM-heavy.
   CMAKE_BUILD_PARALLEL_LEVEL: "2"
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
   performance:
     name: perf + FlameGraph (Ubuntu 26.04)
     runs-on: ubuntu-26.04
-    timeout-minutes: 360
+    # Fail fast if hung (build + perf suite should finish well under this).
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -65,16 +83,25 @@ jobs:
           fi
           free -h
 
+      # Restore apt package archives when possible to cut install time.
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: perf-apt-u2604-v1
+          restore-keys: |
+            perf-apt-u2604-
+
       - name: Install system dependencies
         run: |
           set -euxo pipefail
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
             ccache cmake ninja-build git wget ca-certificates python3 pkg-config \
             xvfb dbus-x11 \
             linux-tools-common linux-tools-generic \
             glslc mm-common libgstreamer-plugins-bad1.0-dev || true
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          sudo apt-get install -y --no-install-recommends \
             "linux-tools-$(uname -r)" || true
 
           wget -q -O /tmp/install_dependencies.sh \
@@ -83,6 +110,8 @@ jobs:
             echo "install_dependencies --full failed; retrying --recommended"
             bash /tmp/install_dependencies.sh --recommended
           fi
+          # Drop apt lists from runner disk; archives may remain in cache path above.
+          sudo rm -rf /var/lib/apt/lists/* /tmp/install_dependencies.sh
 
       - name: Verify perf availability
         run: |
@@ -107,6 +136,8 @@ jobs:
           perf script -i /tmp/perf-sanity.data | head -3 || true
           rm -f /tmp/perf-sanity.data
 
+      # ccache is the primary speed lever; full build-dir caches are multi-GB and
+      # often cost more upload/download time than they save for Inkscape.
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -119,6 +150,7 @@ jobs:
       - name: Configure (RelWithDebInfo + performance tests)
         run: |
           set -euxo pipefail
+          ccache --set-config=max_size="${CCACHE_MAXSIZE}" || true
           ccache --zero-stats || true
           cmake -S . -B "${BUILD_DIR}" -G Ninja \
             -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
@@ -137,21 +169,12 @@ jobs:
           fi
           grep -E 'Performance testing|PERF_TESTS_AVAILABLE|gtkmm|GTKMM' cmake-configure.log || true
 
-      - name: Build inkscape
+      # Single build step for all required targets (avoids 3x cmake --build startup).
+      - name: Build inkscape + tests
         run: |
           set -euxo pipefail
-          cmake --build "${BUILD_DIR}" --target inkscape 2>&1 | tee build-inkscape.log
+          cmake --build "${BUILD_DIR}" --target inkscape tests unit_tests 2>&1 | tee build-perf.log
           ccache --show-stats || true
-
-      - name: Build integration tests target
-        run: |
-          set -euxo pipefail
-          cmake --build "${BUILD_DIR}" --target tests 2>&1 | tee build-tests.log
-
-      - name: Build unit_tests target
-        run: |
-          set -euxo pipefail
-          cmake --build "${BUILD_DIR}" --target unit_tests 2>&1 | tee build-unit_tests.log
 
       - name: List registered performance tests
         run: |
@@ -170,6 +193,9 @@ jobs:
           sudo sysctl -w kernel.perf_event_paranoid=-1 || sudo sysctl -w kernel.perf_event_paranoid=1 || true
           export LIBGL_ALWAYS_SOFTWARE=1
           export PERF_TEST_ALLOW_WORKLOAD_FAILURE="${PERF_TEST_ALLOW_WORKLOAD_FAILURE}"
+          # Ensure a clean report dir for this run only.
+          rm -rf "${BUILD_DIR}/performance_reports"
+          mkdir -p "${BUILD_DIR}/performance_reports"
           xvfb-run -a --server-args="-screen 0 1024x768x24" \
             ctest --test-dir "${BUILD_DIR}" \
               -L performance \
@@ -177,36 +203,58 @@ jobs:
               --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
               -j1 2>&1 | tee ctest-performance.log
 
-      - name: Summarize flame graphs
+      - name: Collect flame graphs (SVG-only, no runner pollution)
         if: always()
         run: |
           set -euxo pipefail
           report_dir="${BUILD_DIR}/performance_reports"
-          if [ -d "${report_dir}" ]; then
-            find "${report_dir}" -name '*.svg' -type f ! -name '*-latest.svg' | sort | tee perf-report-index.txt
-            count="$(find "${report_dir}" -name '*.svg' -type f ! -name '*-latest.svg' | wc -l | tr -d ' ')"
-            echo "Flame graph count: ${count}"
-            if [ "${count:-0}" -lt 1 ]; then
-              echo "No flame graph SVGs were produced." >&2
-              exit 1
-            fi
-          else
+          artifact_dir="${RUNNER_TEMP}/perf-flamegraphs"
+          rm -rf "${artifact_dir}"
+          mkdir -p "${artifact_dir}"
+
+          if [ ! -d "${report_dir}" ]; then
             echo "No performance_reports directory found." | tee perf-report-index.txt
             exit 1
           fi
+
+          # run_perf_test.sh already drops perf.data / folded / script / meta;
+          # remove anything non-SVG that might remain (stale files, crashes mid-run).
+          find "${report_dir}" -type f ! -name '*.svg' -delete 2>/dev/null || true
+          find "${report_dir}" -type l ! -name '*.svg' -delete 2>/dev/null || true
+
+          # Copy only unique timestamped SVGs (skip *-latest.svg symlinks/copies).
+          mapfile -t svgs < <(find "${report_dir}" -maxdepth 1 -name '*.svg' -type f ! -name '*-latest.svg' | sort)
+          count="${#svgs[@]}"
+          printf '%s\n' "${svgs[@]}" | tee perf-report-index.txt
+          echo "Flame graph count: ${count}"
+
+          if [ "${count}" -lt 1 ]; then
+            echo "No flame graph SVGs were produced." >&2
+            exit 1
+          fi
+
+          for f in "${svgs[@]}"; do
+            cp -a "${f}" "${artifact_dir}/"
+          done
+          cp -a perf-test-list.txt perf-report-index.txt ctest-performance.log "${artifact_dir}/" 2>/dev/null || true
+
+          # Lightweight summary for the Actions UI log.
+          du -sh "${artifact_dir}" || true
+          ls -la "${artifact_dir}" || true
+
+          # Free runner disk: drop report dir in the build tree; artifacts live under RUNNER_TEMP.
+          rm -rf "${report_dir}"
 
       - name: Upload flame graph artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: performance-flamegraphs-${{ github.run_id }}
-          path: |
-            ${{ env.BUILD_DIR }}/performance_reports/
-            perf-test-list.txt
-            perf-report-index.txt
-            ctest-performance.log
+          path: ${{ runner.temp }}/perf-flamegraphs/
           if-no-files-found: warn
-          retention-days: 30
+          # 1 week retention — flamegraphs are diagnostic snapshots, not long-term archives.
+          retention-days: 7
+          compression-level: 9
 
       - name: Upload build / CTest logs on failure
         if: failure()
@@ -215,12 +263,29 @@ jobs:
           name: performance-failure-logs-${{ github.run_id }}
           path: |
             cmake-configure.log
-            build-inkscape.log
-            build-tests.log
-            build-unit_tests.log
+            build-perf.log
             ctest-performance.log
             ${{ env.BUILD_DIR }}/Testing/Temporary/
             perf-test-list.txt
             perf-report-index.txt
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
+          compression-level: 9
+
+      # Always trim perf intermediates and bound ccache so runner/cache storage stays lean.
+      - name: Clean runner workspace (avoid storage pollution)
+        if: always()
+        run: |
+          set -euxo pipefail
+          # Remove perf intermediates anywhere under the workspace (belt + suspenders).
+          find "${GITHUB_WORKSPACE}" \( \
+            -name '*.perf.data' -o \
+            -name '*.perf.script' -o \
+            -name '*.folded' -o \
+            -name '*.meta.txt' \
+          \) -type f -delete 2>/dev/null || true
+          rm -rf "${BUILD_DIR}/performance_reports" || true
+          rm -f /tmp/perf-sanity.data /tmp/inkscape-perf-* 2>/dev/null || true
+          # Shrink ccache to configured max so the saved cache tarball stays bounded.
+          ccache --max-size="${CCACHE_MAXSIZE}" --cleanup || true
+          df -h || true
