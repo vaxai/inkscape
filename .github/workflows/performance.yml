@@ -18,7 +18,10 @@ on:
   pull_request:
     branches: [master]
   push:
-    branches: [master]
+    branches:
+      - master
+      # TEMP verification only — remove after the branch run is green.
+      - feature/perf-flamegraph-reports-svg-only
   workflow_dispatch:
 
 concurrency:
