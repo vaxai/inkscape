@@ -25,10 +25,7 @@ on:
       - 'LICENSES/**'
       - '.gitignore'
   push:
-    branches:
-      - master
-      # TEMP verification only — remove after the branch run is green.
-      - feature/perf-flamegraph-reports-svg-only
+    branches: [master]
     paths-ignore:
       - '**.md'
       - 'doc/**'
