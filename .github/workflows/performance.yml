@@ -1,8 +1,9 @@
 # Performance tests (Linux perf + FlameGraph)
 #
 # Runs on every pull request targeting master, and on every push/merge to master.
-# Requires Linux runners (perf is Linux-only). Flame graph SVGs are uploaded as
-# artifacts for review.
+# Uses the official Inkscape CI Docker image so GTK/gtkmm and other deps match
+# GitLab CI (avoids Ubuntu 24.04's too-old system gtkmm and incomplete in-tree
+# gtkmm bootstrap on stock runners).
 #
 # Cost: this repository is public, so GitHub Actions minutes are free/unlimited
 # for standard GitHub-hosted runners. Private repos get a monthly free allowance
@@ -20,102 +21,79 @@ on:
       # Temporary: also run on this feature branch while we iterate on the workflow
       # before a PR exists. Remove once the PR is open and green.
       - feature/perf-flamegraph-reports-svg-only
-  # Allow maintainers to re-run perf suite on a branch without opening a PR.
   workflow_dispatch:
 
 concurrency:
-  # One perf run per PR / branch at a time; cancel superseded runs.
   group: performance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
-  # Keep CI within reasonable time on standard runners (2 cores, ~7 GB RAM).
   CMAKE_BUILD_TYPE: RelWithDebInfo
   BUILD_DIR: build-perf
   CCACHE_DIR: ${{ github.workspace }}/.ccache
-  # Modest iteration count: enough samples for flame graphs without huge runtimes.
   PERF_TEST_ITERATIONS: "2"
   PERF_TEST_MAX_TIME: "30"
   PERF_TEST_CALL_STACK_MODE: userspace
-  # Post-process budget is separate; CTest timeout = MAX_TIME + this.
   PERF_TEST_POSTPROCESS_TIME: "300"
-  # Single-job compile parallelism; Inkscape is memory-heavy in RelWithDebInfo.
-  CMAKE_BUILD_PARALLEL_LEVEL: "1"
+  # Memory-safe default; inkscape_base TUs are large in RelWithDebInfo.
+  CMAKE_BUILD_PARALLEL_LEVEL: "2"
 
 jobs:
   performance:
-    name: perf + FlameGraph (Ubuntu)
-    runs-on: ubuntu-24.04
+    name: perf + FlameGraph (Inkscape CI image)
+    runs-on: ubuntu-latest
     timeout-minutes: 360
+    # Official Inkscape build image (Ubuntu 26.04 + full deps). Privileged so
+    # Linux perf can open perf_events inside the container.
+    container:
+      image: registry.gitlab.com/inkscape/inkscape-ci-docker/master
+      options: --privileged
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Shallow is fine; submodules were converted to normal directories in this fork.
           fetch-depth: 1
 
-      - name: Add swap (avoid OOM during RelWithDebInfo build)
+      - name: Install perf + xvfb inside CI image
         run: |
-          set -euxo pipefail
-          # GitHub-hosted runners have ~7 GB RAM; large C++ TUs can spike past that.
-          if [ ! -f /swapfile ]; then
-            sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-          fi
-          free -h
-          swapon --show || true
-
-      - name: Install system dependencies
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          # Build tooling + perf (kernel-specific package with generic fallback).
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          # Kernel-specific perf may not match the host kernel; install common + generic.
+          apt-get install -y --no-install-recommends \
             ccache \
-            cmake \
-            ninja-build \
-            git \
-            wget \
-            ca-certificates \
-            python3 \
-            pkg-config \
             linux-tools-common \
             linux-tools-generic \
-            "linux-tools-$(uname -r)" || \
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ccache cmake ninja-build git wget ca-certificates python3 pkg-config \
-            linux-tools-common linux-tools-generic
+            xvfb \
+            dbus-x11 \
+            || true
+          # Try exact kernel package when available on this runner image.
+          apt-get install -y --no-install-recommends "linux-tools-$(uname -r)" || true
 
-          # Inkscape build/runtime deps (official CI helper from inkscape-ci-docker).
-          wget -q -O /tmp/install_dependencies.sh \
-            "https://gitlab.com/inkscape/inkscape-ci-docker/-/raw/master/install_dependencies.sh"
-          bash /tmp/install_dependencies.sh --recommended
-
-          # Headless GTK/Inkscape needs a display; xvfb covers rendering/CLI paths.
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            xvfb dbus-x11
-
-      - name: Verify perf availability
-        run: |
-          set -euxo pipefail
           if ! command -v perf >/dev/null 2>&1; then
-            # Some images only ship perf as perf_<kernelver>.
             if command -v "perf_$(uname -r)" >/dev/null 2>&1; then
-              sudo ln -sf "$(command -v "perf_$(uname -r)")" /usr/local/bin/perf
+              ln -sf "$(command -v "perf_$(uname -r)")" /usr/local/bin/perf
             else
-              echo "perf not found; cannot run performance tests" >&2
-              exit 1
+              # Fallback: any perf_* on PATH
+              perf_bin="$(command -v perf_* 2>/dev/null | head -1 || true)"
+              if [ -n "${perf_bin}" ]; then
+                ln -sf "${perf_bin}" /usr/local/bin/perf
+              fi
             fi
           fi
-          perf --version
-          # Allow non-root perf record (may be restricted on some hosts).
-          sudo sysctl -w kernel.perf_event_paranoid=-1 || \
-            sudo sysctl -w kernel.perf_event_paranoid=1 || true
+          command -v perf
+          perf --version || perf version || true
+
+      - name: Enable perf events
+        run: |
+          set -eux
+          if [ -w /proc/sys/kernel/perf_event_paranoid ]; then
+            echo -1 > /proc/sys/kernel/perf_event_paranoid || echo 1 > /proc/sys/kernel/perf_event_paranoid || true
+          else
+            sysctl -w kernel.perf_event_paranoid=-1 || sysctl -w kernel.perf_event_paranoid=1 || true
+          fi
           cat /proc/sys/kernel/perf_event_paranoid || true
-          # Sanity: record a trivial workload.
           perf record -o /tmp/perf-sanity.data -- sleep 0.1
           perf script -i /tmp/perf-sanity.data | head -3 || true
           rm -f /tmp/perf-sanity.data
@@ -124,14 +102,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: perf-ccache-${{ runner.os }}-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}
+          key: perf-ccache-ciimg-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}
           restore-keys: |
-            perf-ccache-${{ runner.os }}-${{ env.CMAKE_BUILD_TYPE }}-
-            perf-ccache-${{ runner.os }}-
+            perf-ccache-ciimg-${{ env.CMAKE_BUILD_TYPE }}-
+            perf-ccache-ciimg-
 
       - name: Configure (RelWithDebInfo + performance tests)
         run: |
-          set -euxo pipefail
+          set -eux
           ccache --zero-stats || true
           cmake -S . -B "${BUILD_DIR}" -G Ninja \
             -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
@@ -144,30 +122,28 @@ jobs:
             -DPERF_TEST_POSTPROCESS_TIME="${PERF_TEST_POSTPROCESS_TIME}" \
             -DPERF_TEST_CALL_STACK_MODE="${PERF_TEST_CALL_STACK_MODE}" \
             2>&1 | tee cmake-configure.log
-          # Surface perf registration status in the job log.
-          grep -E 'Performance testing|Registered .* performance tests|perf executable|unavailable' \
+          grep -E 'Performance testing|Registered .* performance tests|PERF_TESTS_AVAILABLE|gtkmm|GTKMM' \
             cmake-configure.log || true
 
       - name: Build inkscape
         run: |
-          set -euxo pipefail
-          # Build sequentially with full log capture (OOM/compiler errors are otherwise lost).
-          cmake --build "${BUILD_DIR}" --target inkscape -j1 2>&1 | tee build-inkscape.log
+          set -eux
+          cmake --build "${BUILD_DIR}" --target inkscape 2>&1 | tee build-inkscape.log
           ccache --show-stats || true
 
       - name: Build integration tests target
         run: |
-          set -euxo pipefail
-          cmake --build "${BUILD_DIR}" --target tests -j1 2>&1 | tee build-tests.log
+          set -eux
+          cmake --build "${BUILD_DIR}" --target tests 2>&1 | tee build-tests.log
 
       - name: Build unit_tests target
         run: |
-          set -euxo pipefail
-          cmake --build "${BUILD_DIR}" --target unit_tests -j1 2>&1 | tee build-unit_tests.log
+          set -eux
+          cmake --build "${BUILD_DIR}" --target unit_tests 2>&1 | tee build-unit_tests.log
 
       - name: List registered performance tests
         run: |
-          set -euxo pipefail
+          set -eux
           ctest --test-dir "${BUILD_DIR}" -N -L performance | tee perf-test-list.txt
           count="$(ctest --test-dir "${BUILD_DIR}" -N -L performance | grep -c 'Test #' || true)"
           echo "Registered performance tests: ${count}"
@@ -178,24 +154,34 @@ jobs:
 
       - name: Run performance tests
         run: |
-          set -euxo pipefail
-          # Re-apply perf permissions in case the kernel reset them.
-          sudo sysctl -w kernel.perf_event_paranoid=-1 || \
-            sudo sysctl -w kernel.perf_event_paranoid=1 || true
+          set -eux
+          if [ -w /proc/sys/kernel/perf_event_paranoid ]; then
+            echo -1 > /proc/sys/kernel/perf_event_paranoid || true
+          else
+            sysctl -w kernel.perf_event_paranoid=-1 || true
+          fi
 
-          # Many Inkscape tests expect a display; wrap the whole suite in xvfb.
           export LIBGL_ALWAYS_SOFTWARE=1
-          xvfb-run -a --server-args="-screen 0 1024x768x24" \
+          # xvfb may be optional for pure unit tests but is needed for rendering/CLI paths.
+          if command -v xvfb-run >/dev/null 2>&1; then
+            xvfb-run -a --server-args="-screen 0 1024x768x24" \
+              ctest --test-dir "${BUILD_DIR}" \
+                -L performance \
+                --output-on-failure \
+                --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
+                -j1 2>&1 | tee ctest-performance.log
+          else
             ctest --test-dir "${BUILD_DIR}" \
               -L performance \
               --output-on-failure \
               --timeout $(( PERF_TEST_MAX_TIME + PERF_TEST_POSTPROCESS_TIME )) \
               -j1 2>&1 | tee ctest-performance.log
+          fi
 
       - name: Summarize flame graphs
         if: always()
         run: |
-          set -euxo pipefail
+          set -eux
           report_dir="${BUILD_DIR}/performance_reports"
           if [ -d "${report_dir}" ]; then
             echo "=== Flame graph SVGs ==="
