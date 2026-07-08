@@ -1,0 +1,449 @@
+# Memory leak regression detection (Valgrind memcheck vs PR base / master).
+# Optimized for GitHub free-tier minutes: unit tests only, ccache, single OS,
+# build/scan PR head first (fail fast), baseline second (non-fatal fallback),
+# optional helgrind (workflow_dispatch only).
+name: Memory Leak Detection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    # Skip pure doc/translation/asset PRs to conserve free-tier minutes.
+    paths-ignore:
+      - "**.md"
+      - "po/**"
+      - "share/tutorials/**"
+      - "share/screens/**"
+      - "share/branding/**"
+      - "doc/**"
+      - "LICENSES/**"
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Baseline git ref (branch/tag/sha)
+        required: false
+        default: master
+      tests_mode:
+        description: unit | all | auto
+        required: false
+        default: unit
+      run_helgrind:
+        description: Also run helgrind (slow)
+        type: boolean
+        required: false
+        default: false
+      allow_growth_bytes:
+        description: Fail if existing leak signature grows by more than this many bytes
+        required: false
+        default: "0"
+
+concurrency:
+  group: memleak-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_COMPRESS: "1"
+  CCACHE_MAXSIZE: 1500M
+  CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
+  CMAKE_BUILD_TYPE: RelWithDebInfo
+  MEMLEAK_TESTS_MODE: ${{ github.event.inputs.tests_mode || 'unit' }}
+  MEMLEAK_ALLOW_GROWTH_BYTES: ${{ github.event.inputs.allow_growth_bytes || '0' }}
+  # Cap free-tier burn: pure unit suite is ~36 tests; still allow full unit by default.
+  MEMLEAK_MAX_TESTS: "0"
+  BUILD_DIR: build-memleak
+  REPORT_ROOT: memleak-out
+
+jobs:
+  memcheck:
+    name: Valgrind memcheck (unit)
+    # Ubuntu 26.04 ships gtkmm >= 4.13.3; 24.04's 4.10 forces an incomplete
+    # in-tree gtkmm ExternalProject and fails at "Configure current".
+    runs-on: ubuntu-26.04
+    # Unit-only + ccache: should finish well under this; fail-fast to save minutes.
+    timeout-minutes: 90
+    steps:
+      - name: Checkout PR / branch (full history for baseline ref)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve baseline ref
+        id: base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF_INPUT: ${{ github.event.inputs.target_ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            REF="${PR_BASE_REF:-master}"
+          else
+            REF="${BASE_REF_INPUT:-master}"
+          fi
+          HEAD_SHA="$(git rev-parse HEAD)"
+          SHA=""
+          PRETTY="${REF}"
+          if ! git remote get-url origin >/dev/null 2>&1; then
+            git remote add origin "https://github.com/${REPO}.git" 2>/dev/null || true
+          fi
+          git fetch --no-tags origin "${REF}" 2>/dev/null
+          git fetch --no-tags origin "+refs/heads/${REF}:refs/remotes/origin/${REF}" 2>/dev/null
+          if git rev-parse --verify "origin/${REF}" >/dev/null 2>&1; then
+            SHA="$(git rev-parse "origin/${REF}")"
+            PRETTY="origin/${REF}"
+          elif git rev-parse --verify "${REF}" >/dev/null 2>&1; then
+            SHA="$(git rev-parse "${REF}")"
+          elif [[ -n "${PR_BASE_SHA}" ]]; then
+            SHA="${PR_BASE_SHA}"
+            git fetch --no-tags origin "${SHA}" 2>/dev/null || true
+          else
+            SHA="${HEAD_SHA}"
+            PRETTY="HEAD-fallback"
+          fi
+          echo "ref=${PRETTY}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+          if [[ "${SHA}" == "${HEAD_SHA}" ]]; then
+            echo "same_as_head=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "same_as_head=0" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Baseline: ${PRETTY} (${SHA}); HEAD=${HEAD_SHA}"
+          exit 0
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          CORE=(
+            build-essential ccache cmake ninja-build meson pkg-config python3 git valgrind ragel
+            libboost-all-dev libboost-stacktrace-dev libdouble-conversion-dev libgc-dev libgsl-dev
+            libgtk-4-dev libgtkmm-4.0-dev libgtksourceview-5-dev
+            libspelling-1-dev libadwaita-1-dev
+            libpoppler-glib-dev libpoppler-private-dev
+            libpotrace-dev libreadline-dev
+            libvisio-dev libcdr-dev libwpg-dev libwpd-dev librevenge-dev
+            libxml2-dev libxslt1-dev libpango1.0-dev libcairo2-dev
+            libjpeg-dev libpng-dev liblcms2-dev liblcms2-utils
+            libsoup-3.0-dev libepoxy-dev
+            libfreetype6-dev libfontconfig1-dev libharfbuzz-dev
+            libgtest-dev libgmock-dev googletest gettext intltool
+            libsigc++-3.0-dev libcairomm-1.16-dev libpangomm-2.48-dev
+            libglibmm-2.68-dev libgdk-pixbuf-2.0-dev
+          )
+          if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${CORE[@]}"; then
+            for pkg in "${CORE[@]}"; do
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$pkg" || true
+            done
+          fi
+          # Unit tests link GTest::gmock; ensure the CMake target exists (libgmock-dev
+          # on Ubuntu 26.04, or a local build from /usr/src/googletest otherwise).
+          arch="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo x86_64-linux-gnu)"
+          if [[ ! -f "/usr/lib/${arch}/cmake/GTest/GMockTargets.cmake" && -d /usr/src/googletest ]]; then
+            sudo cmake -S /usr/src/googletest -B /tmp/gtest-build -DBUILD_GMOCK=ON
+            sudo cmake --build /tmp/gtest-build --parallel "$(nproc)"
+            sudo cmake --install /tmp/gtest-build
+          fi
+          # Fail fast with a clear message if gmock is still missing (saves full cmake noise).
+          if [[ ! -f "/usr/lib/${arch}/cmake/GTest/GMockTargets.cmake" ]] && \
+             ! grep -rq 'add_library(GTest::gmock' "/usr/lib/${arch}/cmake/GTest" 2>/dev/null; then
+            echo "GTest::gmock CMake target is missing; install libgmock-dev or build googletest." >&2
+            ls -la "/usr/lib/${arch}/cmake/GTest" 2>&1 || true
+            exit 1
+          fi
+
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: memleak-ccache-u2604-v1-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}-${{ github.sha }}
+          restore-keys: |
+            memleak-ccache-u2604-v1-${{ hashFiles('CMakeLists.txt', 'CMakeScripts/**') }}-
+            memleak-ccache-u2604-v1-
+
+      - name: Tooling prep
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x buildtools/memleak/*.sh buildtools/memleak/*.py
+          mkdir -p "${BUILD_DIR}" "${REPORT_ROOT}"
+          df -h . || true
+          cmake --version | head -1
+          ninja --version
+          valgrind --version
+
+      # ---- Current / PR head first (fail fast on the branch under review) ----
+      - name: Configure current
+        id: current_cfg
+        shell: bash
+        run: |
+          mkdir -p "${BUILD_DIR}" "${REPORT_ROOT}"
+          echo "PWD=$(pwd)"
+          ls | head
+          set -o pipefail
+          cmake -S . -B "${BUILD_DIR}" -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DBUILD_TESTING=ON \
+            -DBUILD_SHARED_LIBS=ON \
+            -DTESTS_WITH_ASAN=OFF \
+            -DWITH_ASAN=OFF \
+            -DBUILD_PERFORMANCE_TESTS=OFF \
+            -DWITH_INTERNAL_2GEOM=ON \
+            >"${REPORT_ROOT}/cmake-current.log" 2>&1
+          rc=$?
+          echo "cmake_exit=${rc}" | tee -a "${REPORT_ROOT}/cmake-current.log"
+          # Always print tail so it is visible in the Actions UI without downloading artifacts.
+          tail -n 120 "${REPORT_ROOT}/cmake-current.log" || true
+          exit "${rc}"
+
+      - name: Build current (unit_tests only)
+        id: current_build
+        shell: bash
+        run: |
+          # Build only unit test binaries + deps (skips inkscape app, cli/render suites).
+          # Major free-tier minute saver vs full `ninja all`.
+          cmake --build "${BUILD_DIR}" --target unit_tests --parallel "$(nproc)" \
+            |& tee "${REPORT_ROOT}/build-current.log"
+          ccache -s |& tee "${REPORT_ROOT}/ccache-current.txt" || true
+          # Require real unit-test style binaries (not just any executable).
+          mapfile -t UNIT_BINS < <(
+            find "${BUILD_DIR}/bin" -maxdepth 1 -type f \( -name '*-test' -o -name 'assertions-in-tests' \) -perm -111 2>/dev/null | sort
+          )
+          bin_count="${#UNIT_BINS[@]}"
+          echo "unit_test_binaries=${bin_count}" | tee -a "${REPORT_ROOT}/build-current.log"
+          printf '%s\n' "${UNIT_BINS[@]:-}" | tee "${REPORT_ROOT}/unit_bins.txt" | head -n 50
+          if [[ "${bin_count}" -lt 1 ]]; then
+            echo "error: unit_tests target produced no *-test binaries under ${BUILD_DIR}/bin" >&2
+            ls -la "${BUILD_DIR}/bin" 2>&1 || true
+            find "${BUILD_DIR}" -type f \( -name '*-test' -o -name 'assertions-in-tests' \) 2>/dev/null | head | tee -a "${REPORT_ROOT}/build-current.log" || true
+            exit 1
+          fi
+
+      - name: Run memcheck on current
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          MEMLEAK_TIMEOUT_PER_TEST=180 \
+          MEMLEAK_MAX_TESTS="${MEMLEAK_MAX_TESTS}" \
+          ./buildtools/memleak/run_memcheck.sh \
+            --build-dir "${BUILD_DIR}" \
+            --out-dir "${REPORT_ROOT}/current" \
+            --label current \
+            --tool memcheck \
+            --tests "${MEMLEAK_TESTS_MODE}" \
+            --jobs 1
+          rc=$?
+          set -e
+          {
+            echo "## Memcheck current (exit ${rc})"
+            echo ""
+            for f in \
+              current/enumerate_stdout.txt current/enumerate_stderr.txt \
+              current/enumerate_diagnostics.json current/bin_ls.txt \
+              current/bash_fallback.txt current/ctest_show_only.meta
+            do
+              if [[ -f "${REPORT_ROOT}/${f}" ]]; then
+                echo "<details><summary>${f}</summary>"
+                echo ""
+                echo '```'
+                sed -n '1,120p' "${REPORT_ROOT}/${f}" || true
+                echo '```'
+                echo "</details>"
+                echo ""
+              fi
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit "${rc}"
+
+      # ---- Baseline side (optional; non-fatal if it fails) ----
+      - name: Configure & build baseline
+        id: baseline_build
+        if: steps.base.outputs.same_as_head != '1'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --force --detach "${{ steps.base.outputs.sha }}"
+          git reset --hard HEAD
+          # Keep scripts from HEAD so baseline scan uses the fixed runner even when
+          # the base branch does not contain buildtools/memleak yet.
+          git checkout "${{ steps.base.outputs.head_sha }}" -- buildtools/memleak .github/workflows/memleak.yml 2>/dev/null || true
+          rm -rf "${BUILD_DIR}"
+          mkdir -p "${BUILD_DIR}"
+          cmake -S "${GITHUB_WORKSPACE}" -B "${BUILD_DIR}" -G Ninja \
+            -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DBUILD_TESTING=ON \
+            -DBUILD_SHARED_LIBS=ON \
+            -DTESTS_WITH_ASAN=OFF \
+            -DWITH_ASAN=OFF \
+            -DBUILD_PERFORMANCE_TESTS=OFF \
+            -DWITH_INTERNAL_2GEOM=ON \
+            2>&1 | tee "${REPORT_ROOT}/cmake-baseline.log"
+          cmake --build "${BUILD_DIR}" --target unit_tests --parallel "$(nproc)" \
+            2>&1 | tee "${REPORT_ROOT}/build-baseline.log"
+          ccache -s | tee "${REPORT_ROOT}/ccache-baseline.txt" || true
+
+      - name: Run memcheck on baseline
+        id: baseline_scan
+        if: steps.base.outputs.same_as_head != '1' && steps.baseline_build.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          MEMLEAK_TIMEOUT_PER_TEST=180 \
+          MEMLEAK_MAX_TESTS="${MEMLEAK_MAX_TESTS}" \
+          ./buildtools/memleak/run_memcheck.sh \
+            --build-dir "${BUILD_DIR}" \
+            --out-dir "${REPORT_ROOT}/baseline" \
+            --label baseline \
+            --tool memcheck \
+            --tests "${MEMLEAK_TESTS_MODE}" \
+            --jobs 1
+
+      - name: Compare baseline vs current
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${REPORT_ROOT}/baseline"
+          BASE_JSONL="${REPORT_ROOT}/baseline/baseline.memcheck.jsonl"
+          CUR_JSONL="${REPORT_ROOT}/current/current.memcheck.jsonl"
+          MODE="full"
+          if [[ "${{ steps.base.outputs.same_as_head }}" == "1" ]]; then
+            MODE="same_sha"
+            : > "${BASE_JSONL}"
+          elif [[ "${{ steps.baseline_build.outcome }}" != "success" || "${{ steps.baseline_scan.outcome }}" != "success" ]]; then
+            MODE="empty_fallback"
+            echo "warning: baseline build/scan failed; comparing current against empty baseline" | tee "${REPORT_ROOT}/baseline-fallback.txt"
+            : > "${BASE_JSONL}"
+          fi
+          [[ -f "${BASE_JSONL}" ]] || : > "${BASE_JSONL}"
+          [[ -f "${CUR_JSONL}" ]] || : > "${CUR_JSONL}"
+          set +e
+          python3 buildtools/memleak/compare_leaks.py \
+            --baseline "${BASE_JSONL}" \
+            --current "${CUR_JSONL}" \
+            --baseline-label "${{ steps.base.outputs.ref }}" \
+            --current-label "${{ steps.base.outputs.head_sha }}" \
+            --allow-growth-bytes "${MEMLEAK_ALLOW_GROWTH_BYTES}" \
+            --report-md "${REPORT_ROOT}/diff.md" \
+            --report-json "${REPORT_ROOT}/diff.json"
+          rc=$?
+          set -e
+          echo "exit_code=${rc}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Memory leak regression report"
+            echo ""
+            echo "- Baseline mode: \`${MODE}\`"
+            echo ""
+            if [[ -f "${REPORT_ROOT}/diff.md" ]]; then
+              cat "${REPORT_ROOT}/diff.md"
+            else
+              echo "_diff.md missing_"
+            fi
+            for f in \
+              cmake-current.log build-current.log cmake-baseline.log build-baseline.log \
+              current/enumerate_diagnostics.json current/enumerate_stdout.txt \
+              current/bin_ls.txt
+            do
+              if [[ -f "${REPORT_ROOT}/${f}" ]]; then
+                echo ""
+                echo "<details><summary>${f} (tail)</summary>"
+                echo ""
+                echo '```'
+                tail -n 50 "${REPORT_ROOT}/${f}" || true
+                echo '```'
+                echo "</details>"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Without a real baseline, treat the report as informational so missing
+          # base builds do not burn retries on free-tier minutes.
+          if [[ "${MODE}" == "empty_fallback" || "${MODE}" == "same_sha" ]]; then
+            echo "info: baseline mode ${MODE}; not failing the job on diff alone"
+            exit 0
+          fi
+          exit "${rc}"
+
+      - name: Upload memleak artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memleak-reports-${{ github.run_id }}
+          path: |
+            ${{ env.REPORT_ROOT }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+  helgrind:
+    name: Valgrind helgrind (optional)
+    if: github.event_name == 'workflow_dispatch' && inputs.run_helgrind == true
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install deps (helgrind path)
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ccache cmake ninja-build meson pkg-config python3 git valgrind \
+            libboost-dev libdouble-conversion-dev libgc-dev libgsl-dev \
+            libgtk-4-dev libgtkmm-4.0-dev libgtksourceview-5-dev \
+            libpoppler-glib-dev libpotrace-dev libreadline-dev \
+            libxml2-dev libxslt1-dev libpango1.0-dev libcairo2-dev \
+            libjpeg-dev libpng-dev liblcms2-dev libgtest-dev libgmock-dev
+
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: memleak-hg-ccache-u2604-v1-${{ github.sha }}
+          restore-keys: |
+            memleak-hg-ccache-u2604-v1-
+            memleak-ccache-u2604-v1-
+
+      - name: Build current only
+        run: |
+          cmake -S . -B build-hg -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DBUILD_TESTING=ON \
+            -DTESTS_WITH_ASAN=OFF \
+            -DWITH_ASAN=OFF \
+            -DBUILD_PERFORMANCE_TESTS=OFF
+          cmake --build build-hg --parallel "$(nproc)"
+
+      - name: Helgrind unit tests
+        run: |
+          chmod +x buildtools/memleak/*.sh buildtools/memleak/*.py
+          MEMLEAK_TIMEOUT_PER_TEST=480 \
+          ./buildtools/memleak/run_memcheck.sh \
+            --build-dir build-hg \
+            --out-dir build-hg/memleak_reports/helgrind \
+            --label helgrind \
+            --tool helgrind \
+            --tests unit \
+            --jobs 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: helgrind-reports-${{ github.run_id }}
+          path: build-hg/memleak_reports/
+          retention-days: 7

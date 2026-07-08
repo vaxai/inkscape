@@ -317,6 +317,41 @@ void ObjectSet::set(XML::Node *repr)
     }
 }
 
+unsigned ObjectSet::setBetween(SPObject *obj_a, SPObject *obj_b)
+{
+    if (!obj_a) {
+        return 0;
+    }
+
+    auto parent = obj_a->parent;
+    if (!obj_b) {
+        obj_b = lastItem();
+    }
+
+    if (!obj_b || parent != obj_b->parent) {
+        return 0;
+    } else if (obj_a == obj_b) {
+        set(obj_a);
+        return 1;
+    }
+    clear();
+
+    unsigned count = 0;
+    unsigned min = std::min(obj_a->getPosition(), obj_b->getPosition());
+    unsigned max = std::max(obj_a->getPosition(), obj_b->getPosition());
+    for (unsigned i = min; i <= max; i++) {
+        if (auto child = parent->nthChild(i)) {
+            // Defer the selection-changed signal until all objects are added,
+            // otherwise large ranges freeze the GUI with one event per object.
+            count += add(child, true);
+        }
+    }
+    if (count > 0U) {
+        _emitChanged();
+    }
+    return count;
+}
+
 void ObjectSet::setReprList(std::vector<XML::Node*> const &list) {
     if(!document())
         return;

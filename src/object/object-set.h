@@ -151,6 +151,20 @@ public:
      */
     void set(SPObject *object, bool persist_selection_context = false);
     void set(XML::Node *repr);
+
+    /**
+     * Select all siblings between two objects under the same parent.
+     *
+     * Emits a single selection-changed signal after all objects are added.
+     *
+     * @param obj_a - The first item; does not have to appear first in the list.
+     * @param obj_b - The last item; does not have to appear last in the list (optional).
+     *                If not set, uses the lastItem selected in the list.
+     *
+     * @returns the number of items added.
+     */
+    unsigned setBetween(SPObject *obj_a, SPObject *obj_b = nullptr);
+
     /**
      * Unselects all selected objects.
      */

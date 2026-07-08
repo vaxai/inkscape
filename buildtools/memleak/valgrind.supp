@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Suppressions for third-party / system / one-time init leaks that are not
+# actionable in Inkscape code. Keep this file strictly focused so we do not
+# hide real Inkscape regressions. Add new entries only when they are confirmed
+# outside of Inkscape's control (fontconfig, GLib singletons, GTK, X11, etc.).
+
+# ---------------------------------------------------------------------------
+# Fontconfig / Freetype (process-lifetime caches)
+# ---------------------------------------------------------------------------
+{
+   fontconfig_FcConfigCreate
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:FcConfigCreate
+}
+{
+   fontconfig_AddFontConfig
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:FcConfigAppFontAddDir
+}
+{
+   fontconfig_FcPatternCreate
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:FcPatternCreate
+}
+{
+   freetype_FT_New_Face
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:FT_New_Face
+}
+
+# ---------------------------------------------------------------------------
+# GLib / GObject / GIO singletons and type system
+# ---------------------------------------------------------------------------
+{
+   gobject_type_system
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:g_type_register_static
+}
+{
+   gobject_type_init
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:g_type_init_with_debug_flags
+}
+{
+   glib_quark
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:g_quark_from_static_string
+}
+{
+   glib_intern_string
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:g_intern_string
+}
+{
+   gio_init
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:g_io_module_load
+}
+
+# ---------------------------------------------------------------------------
+# GTK / GDK / Cairo one-time init
+# ---------------------------------------------------------------------------
+{
+   gtk_init
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:gtk_init_check
+}
+{
+   gdk_display
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:gdk_display_open
+}
+{
+   cairo_ft_font
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:_cairo_ft_unscaled_font_map_lock
+}
+
+# ---------------------------------------------------------------------------
+# X11 / Wayland / DBus (display / session singletons)
+# ---------------------------------------------------------------------------
+{
+   x11_XOpenDisplay
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:XOpenDisplay
+}
+{
+   dbus_bus_get
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:dbus_bus_get_private
+}
+
+# ---------------------------------------------------------------------------
+# C++ / libc runtime (typeinfo, locale, atexit)
+# ---------------------------------------------------------------------------
+{
+   libstdc_typeinfo
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:__cxa_atexit
+}
+{
+   glibc_dlopen
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:_dl_open
+}
+{
+   locale_newlocale
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:newlocale
+}
+
+# ---------------------------------------------------------------------------
+# GoogleTest internals (reachable between tests / at exit)
+# ---------------------------------------------------------------------------
+{
+   gtest_internal
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:_ZN7testing8internal*
+}
+{
+   gtest_RegisterTest
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:_ZN7testing8internal16MakeAndRegisterTestInfo*
+}

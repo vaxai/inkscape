@@ -2159,7 +2159,9 @@ void ObjectsPanel::selectRange(Gtk::TreeModel::Path start, Gtk::TreeModel::Path 
 
     _prev_range.clear();
 
-    // Select everything between the initial selection and currently selected item.
+    // Collect items first, then add them in one batch so selection-changed is
+    // emitted only once (see also ObjectSet::setBetween / issue #4880).
+    std::vector<SPItem *> items;
     _store->foreach ([&](Gtk::TreeModel::Path const &p, Gtk::TreeModel::const_iterator const &it) {
         if ((gtk_tree_path_compare(start.gobj(), p.gobj()) <= 0) &&
             (gtk_tree_path_compare(end.gobj(), p.gobj()) >= 0)) {
@@ -2167,12 +2169,14 @@ void ObjectsPanel::selectRange(Gtk::TreeModel::Path start, Gtk::TreeModel::Path 
             if (obj) {
                 if (!layers.isLayer(obj)) {
                     _prev_range.emplace_back(obj);
-                    selection->add(obj, false);
+                    items.push_back(obj);
                 }
             }
         }
         return false;
     });
+
+    selection->addList(items);
 
     _start_new_range = false;
 }

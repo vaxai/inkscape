@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Run Inkscape under Linux perf and automatically produce a FlameGraph SVG.
+# Intended for interactive / ad-hoc profiling while working on slow paths.
+#
+# Configured by CMake (PerformanceTest.cmake).  Also usable standalone by
+# overriding environment variables or passing flags.
+#
+# Usage:
+#   run_inkscape_perf.sh [options] -- [inkscape args...]
+#
+# Options:
+#   --inkscape PATH            Path to the inkscape binary
+#                              (default: @CMAKE_BINARY_DIR@/bin/inkscape)
+#   --report-dir DIR           Output directory
+#                              (default: @PERF_TEST_REPORT_DIR@)
+#   --run-name NAME            Base name for output files (default: inkscape-run)
+#   --iterations N             Repeat Inkscape N times in one perf session
+#                              (default: 1)
+#   --max-time SECONDS         Abort after this many seconds (default: @PERF_TEST_MAX_TIME@)
+#   --call-stack-mode MODE     kernel | userspace | both (default: @PERF_TEST_CALL_STACK_MODE@)
+#   --perf PATH                perf executable (default: @PERF_EXECUTABLE@)
+#   --flamegraph PATH          flamegraph.pl (default: @FLAMEGRAPH_SCRIPT@)
+#   --stackcollapse PATH       stackcollapse-perf.pl (default: @STACKCOLLAPSE_PERF_SCRIPT@)
+#   --datadir DIR              INKSCAPE_DATADIR override (optional)
+#   --profile-dir DIR          INKSCAPE_PROFILE_DIR override (optional)
+#   --help                     Show this help
+#
+# Output files (timestamped; never overwrite previous runs):
+#   <report-dir>/<run-name>-<timestamp>-<pid>.perf.data
+#   <report-dir>/<run-name>-<timestamp>-<pid>.svg
+#   <report-dir>/<run-name>-latest.svg   (symlink to most recent SVG)
+#
+# Examples:
+#   # Profile opening a file and exiting
+#   run_inkscape_perf.sh -- --actions="file-open:/tmp/a.svg;export-do;quit-now"
+#
+#   # Profile with kernel-only stacks and 5 iterations
+#   run_inkscape_perf.sh --call-stack-mode kernel --iterations 5 -- -V
+#
+#   # Via CMake convenience target (extra args after --):
+#   cmake --build build --target perf_inkscape -- -- -V
+
+set -euo pipefail
+
+PERF_BIN="${PERF_BIN:-@PERF_EXECUTABLE@}"
+FLAMEGRAPH_PL="${FLAMEGRAPH_PL:-@FLAMEGRAPH_SCRIPT@}"
+STACKCOLLAPSE_PL="${STACKCOLLAPSE_PL:-@STACKCOLLAPSE_PERF_SCRIPT@}"
+DEFAULT_INKSCAPE="@CMAKE_BINARY_DIR@/bin/inkscape"
+DEFAULT_REPORT_DIR="@PERF_TEST_REPORT_DIR@"
+DEFAULT_MAX_TIME="@PERF_TEST_MAX_TIME@"
+DEFAULT_CALL_STACK_MODE="@PERF_TEST_CALL_STACK_MODE@"
+DEFAULT_DATADIR="@CMAKE_BINARY_DIR@/inkscape_datadir"
+
+INKSCAPE_BIN="${INKSCAPE_BIN:-$DEFAULT_INKSCAPE}"
+REPORT_DIR="${REPORT_DIR:-$DEFAULT_REPORT_DIR}"
+RUN_NAME="inkscape-run"
+ITERATIONS=1
+MAX_TIME="${DEFAULT_MAX_TIME}"
+CALL_STACK_MODE="${DEFAULT_CALL_STACK_MODE}"
+DATADIR="${DATADIR:-$DEFAULT_DATADIR}"
+PROFILE_DIR="${PROFILE_DIR:-}"
+INKSCAPE_ARGS=()
+
+usage() {
+    sed -n '2,42p' "$0" | sed 's/^# \?//'
+    exit "${1:-0}"
+}
+
+die() {
+    echo "run_inkscape_perf.sh: error: $*" >&2
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --inkscape)        INKSCAPE_BIN="$2"; shift 2 ;;
+        --report-dir)      REPORT_DIR="$2"; shift 2 ;;
+        --run-name)        RUN_NAME="$2"; shift 2 ;;
+        --iterations)      ITERATIONS="$2"; shift 2 ;;
+        --max-time)        MAX_TIME="$2"; shift 2 ;;
+        --call-stack-mode) CALL_STACK_MODE="$2"; shift 2 ;;
+        --perf)            PERF_BIN="$2"; shift 2 ;;
+        --flamegraph)      FLAMEGRAPH_PL="$2"; shift 2 ;;
+        --stackcollapse)   STACKCOLLAPSE_PL="$2"; shift 2 ;;
+        --datadir)         DATADIR="$2"; shift 2 ;;
+        --profile-dir)     PROFILE_DIR="$2"; shift 2 ;;
+        --help|-h)         usage 0 ;;
+        --)                shift; INKSCAPE_ARGS=("$@"); break ;;
+        *)                 # treat remaining as inkscape args without requiring --
+                           INKSCAPE_ARGS=("$@"); break ;;
+    esac
+done
+
+[[ -x "$INKSCAPE_BIN" || -f "$INKSCAPE_BIN" ]] || die "inkscape binary not found: $INKSCAPE_BIN"
+command -v "$PERF_BIN" >/dev/null 2>&1 || die "perf not found: $PERF_BIN"
+[[ -f "$FLAMEGRAPH_PL" ]] || die "flamegraph.pl not found: $FLAMEGRAPH_PL"
+[[ -f "$STACKCOLLAPSE_PL" ]] || die "stackcollapse-perf.pl not found: $STACKCOLLAPSE_PL"
+[[ "$ITERATIONS" =~ ^[1-9][0-9]*$ ]] || die "--iterations must be a positive integer"
+case "$CALL_STACK_MODE" in
+    kernel|userspace|both) ;;
+    *) die "--call-stack-mode must be kernel, userspace, or both" ;;
+esac
+
+mkdir -p "$REPORT_DIR"
+
+TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+RUN_ID="${TIMESTAMP}-$$"
+SAFE_NAME="${RUN_NAME//\//_}"
+
+PERF_DATA="${REPORT_DIR}/${SAFE_NAME}-${RUN_ID}.perf.data"
+PERF_SCRIPT_OUT="${REPORT_DIR}/${SAFE_NAME}-${RUN_ID}.perf.script"
+FOLDED_OUT="${REPORT_DIR}/${SAFE_NAME}-${RUN_ID}.folded"
+SVG_OUT="${REPORT_DIR}/${SAFE_NAME}-${RUN_ID}.svg"
+META_OUT="${REPORT_DIR}/${SAFE_NAME}-${RUN_ID}.meta.txt"
+LATEST_LINK="${REPORT_DIR}/${SAFE_NAME}-latest.svg"
+
+PERF_EVENT_ARGS=()
+case "$CALL_STACK_MODE" in
+    kernel)    PERF_EVENT_ARGS=(-e cycles:k --call-graph dwarf) ;;
+    userspace) PERF_EVENT_ARGS=(-e cycles:u --call-graph dwarf) ;;
+    both)      PERF_EVENT_ARGS=(-e cycles --call-graph dwarf) ;;
+esac
+
+export INKSCAPE_DATADIR="${DATADIR}"
+if [[ -n "$PROFILE_DIR" ]]; then
+    export INKSCAPE_PROFILE_DIR="${PROFILE_DIR}"
+fi
+
+PAYLOAD_SCRIPT="$(mktemp "${TMPDIR:-/tmp}/inkscape-perf-inkscape.XXXXXX.sh")"
+cleanup_payload() { rm -f "$PAYLOAD_SCRIPT"; }
+trap cleanup_payload EXIT
+
+{
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    echo "ITERATIONS=${ITERATIONS}"
+    printf 'INKSCAPE_BIN=%q\n' "$INKSCAPE_BIN"
+    echo 'INKSCAPE_ARGS=('
+    for arg in "${INKSCAPE_ARGS[@]+"${INKSCAPE_ARGS[@]}"}"; do
+        printf ' %q' "$arg"
+    done
+    echo
+    echo ')'
+    cat <<'PAYLOAD_BODY'
+for ((i = 1; i <= ITERATIONS; i++)); do
+    echo "--- iteration ${i}/${ITERATIONS} ---"
+    "${INKSCAPE_BIN}" "${INKSCAPE_ARGS[@]}"
+done
+PAYLOAD_BODY
+} >"$PAYLOAD_SCRIPT"
+chmod +x "$PAYLOAD_SCRIPT"
+
+echo "=== Inkscape perf run ==="
+echo "  inkscape:        ${INKSCAPE_BIN}"
+echo "  iterations:      ${ITERATIONS}"
+echo "  max time (s):    ${MAX_TIME}"
+echo "  call stacks:     ${CALL_STACK_MODE}"
+echo "  report dir:      ${REPORT_DIR}"
+echo "  run id:          ${RUN_ID}"
+echo "  args:            ${INKSCAPE_ARGS[*]:-(none)}"
+echo "  INKSCAPE_DATADIR=${INKSCAPE_DATADIR}"
+echo
+
+TIMEOUT_CMD=()
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(timeout --signal=TERM "${MAX_TIME}")
+fi
+
+START_EPOCH="$(date +%s)"
+set +e
+"${TIMEOUT_CMD[@]}" \
+    "$PERF_BIN" record \
+        "${PERF_EVENT_ARGS[@]}" \
+        --output="$PERF_DATA" \
+        -- \
+        bash "$PAYLOAD_SCRIPT" || PERF_RC=$?
+set -e
+PERF_RC="${PERF_RC:-0}"
+END_EPOCH="$(date +%s)"
+ELAPSED=$((END_EPOCH - START_EPOCH))
+
+if [[ "$PERF_RC" -eq 124 ]]; then
+    echo "run_inkscape_perf.sh: FAIL: exceeded maximum time of ${MAX_TIME}s" >&2
+    echo "status=TIMEOUT" >"$META_OUT"
+    exit 1
+fi
+
+if [[ "$PERF_RC" -ne 0 ]]; then
+    echo "run_inkscape_perf.sh: FAIL: exit ${PERF_RC}" >&2
+    echo "status=FAIL exit_code=${PERF_RC}" >"$META_OUT"
+    exit "$PERF_RC"
+fi
+
+echo "Generating flame graph..."
+"$PERF_BIN" script --input="$PERF_DATA" >"$PERF_SCRIPT_OUT"
+perl "$STACKCOLLAPSE_PL" "$PERF_SCRIPT_OUT" >"$FOLDED_OUT"
+perl "$FLAMEGRAPH_PL" \
+    --title "Inkscape: ${RUN_NAME} (${RUN_ID})" \
+    --subtitle "iterations=${ITERATIONS} mode=${CALL_STACK_MODE} elapsed=${ELAPSED}s" \
+    "$FOLDED_OUT" >"$SVG_OUT"
+
+ln -sfn "$(basename "$SVG_OUT")" "$LATEST_LINK"
+
+{
+    echo "status=OK"
+    echo "run_name=${RUN_NAME}"
+    echo "run_id=${RUN_ID}"
+    echo "inkscape=${INKSCAPE_BIN}"
+    echo "iterations=${ITERATIONS}"
+    echo "max_time=${MAX_TIME}"
+    echo "elapsed_seconds=${ELAPSED}"
+    echo "call_stack_mode=${CALL_STACK_MODE}"
+    echo "args=${INKSCAPE_ARGS[*]}"
+    echo "perf_data=${PERF_DATA}"
+    echo "flamegraph_svg=${SVG_OUT}"
+    echo "latest_symlink=${LATEST_LINK}"
+} >"$META_OUT"
+
+echo
+echo "=== Inkscape perf run complete ==="
+echo "  elapsed:         ${ELAPSED}s"
+echo "  perf data:       ${PERF_DATA}"
+echo "  flame graph:     ${SVG_OUT}"
+echo "  latest symlink:  ${LATEST_LINK}"
+echo "  metadata:        ${META_OUT}"
+
+exit 0
